@@ -1,0 +1,37 @@
+--- src/lib/communityPlaylistService.ts
++++ src/lib/communityPlaylistService.ts
+@@ -32,7 +32,7 @@
+ export async function submitPlaylist(data: Omit<CommunityPlaylist, 'id' | 'status' | 'featured' | 'displayOrder' | 'createdAt' | 'playlistId'>): Promise<string> {
+   const playlistId = extractPlaylistId(data.playlistUrl);
+   if (!playlistId) throw new Error('Invalid YouTube playlist URL.');
+-
++  
+   // Check online status
+   if (!navigator.onLine) {
+     queueOfflineSubmission({ ...data, playlistId });
+@@ -44,12 +44,23 @@
+   const snap = await getDocs(q);
+   if (!snap.empty) throw new Error('This playlist has already been submitted.');
+ 
++  // Attempt to fetch thumbnail
++  let thumbnailUrl = data.thumbnailUrl || '';
++  try {
++    const res = await fetch('/api/youtube/playlist', {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({ url: data.playlistUrl }),
++    });
++    const pData = await res.json();
++    if (pData.ok && pData.thumbnailUrl) {
++      thumbnailUrl = pData.thumbnailUrl;
++    }
++  } catch (e) {
++    console.warn('Failed to auto-fetch playlist thumbnail', e);
++  }
++
+   const docRef = await addDoc(collection(db, 'community_playlists'), {
+     ...data,
+     playlistId,
++    thumbnailUrl,
+     status: 'pending',
+     featured: false,

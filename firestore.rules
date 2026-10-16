@@ -1,0 +1,224 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return isAuthenticated() && (
+        request.auth.token.email != null && (
+          request.auth.token.email.lower() == 'sk1gd859122006@gmail.com' ||
+          request.auth.token.email.lower() == 'allsafe7cyber7s@gmail.com' ||
+          request.auth.token.email.lower() == 'developer07vibe@gmail.com' ||
+          request.auth.token.email.lower() == 'official7sbgarmy7@gmail.com' ||
+          request.auth.token.email.lower() == 'sbg.esports07@gmail.com' ||
+          request.auth.token.email.lower() == 'official7sbgarmy7@gamil.com'
+        )
+      );
+    }
+
+    function isAdmin() {
+      return isOwner() || (
+        isAuthenticated() && (
+          request.auth.token.role == 'admin' ||
+          request.auth.token.role == 'owner' ||
+          (
+            exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+            (
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner'
+            )
+          ) ||
+          (
+            exists(/databases/$(database)/documents/staff/$(request.auth.uid)) &&
+            (
+              get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == 'admin' ||
+              get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == 'owner'
+            ) &&
+            get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.status == 'active'
+          )
+        )
+      );
+    }
+
+    function isStaffOrAdmin() {
+      return isAdmin() || (
+        isAuthenticated() && (
+          request.auth.token.role == 'staff' ||
+          (
+            exists(/databases/$(database)/documents/staff/$(request.auth.uid)) &&
+            get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.status == 'active'
+          )
+        )
+      );
+    }
+
+    // User accounts & favorites (Private to user)
+    match /users/{userId} {
+      allow read: if true;
+      // Allow user to initialize/update profile, but prevent role escalation to 'admin' or 'owner'
+      allow create: if isAuthenticated() && request.auth.uid == userId && 
+        (!('role' in request.resource.data) || request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && request.auth.uid == userId && 
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) || isAdmin());
+      allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+
+      match /favorites/{songId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      match /library/{itemId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      match /history/{historyId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      match /playlists/{playlistId} {
+        allow read: if resource.data.visibility == 'public' || resource.data.isPublic == true || (isAuthenticated() && request.auth.uid == userId);
+        allow write: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      match /youtubePlaylists/{playlistId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+
+    // Import checkpoints & alerts (Admin / Staff YouTube Import Engine)
+    match /import_checkpoints/{jobId} {
+      allow read, write: if isStaffOrAdmin();
+    }
+    match /import_alerts/{alertId} {
+      allow read, write: if isStaffOrAdmin();
+    }
+
+    // Songs collection (Public listeners can read; only staff/admins can write)
+    match /songs/{songId} {
+      allow read: if true;
+      allow create, update: if isStaffOrAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Official playlists collection (Public listeners can read; only staff/admins can write)
+    match /playlists/{playlistId} {
+      allow read: if true;
+      allow write: if isStaffOrAdmin();
+    }
+
+    // User Created Playlists (Strict Public/Private Access Rules)
+    match /userPlaylists/{playlistId} {
+      allow read: if resource.data.visibility == 'public' || resource.data.isPublic == true || (isAuthenticated() && resource.data.ownerId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Featured Releases & CTA Config (Admin/Staff only for write)
+    match /featuredReleases/{id} {
+      allow read: if true;
+      allow write: if isStaffOrAdmin();
+    }
+
+    match /siteConfig/{id} {
+      allow read: if true;
+      allow write: if isStaffOrAdmin();
+    }
+
+    match /featuredHistory/{id} {
+      allow read: if true;
+      allow write: if isStaffOrAdmin();
+    }
+
+    // Community Playlists
+    match /community_playlists/{id} {
+      allow read: if true;
+      allow write: if isStaffOrAdmin();
+    }
+
+    // System Settings (Admin/Staff for write)
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isStaffOrAdmin();
+    }
+
+    // Android APK Releases (Public can read published/default; only staff/admins can write/delete)
+    match /androidReleases/{releaseId} {
+      allow read: if true;
+      allow write: if isStaffOrAdmin();
+    }
+
+    // App Downloads Analytics & Stats
+    match /analytics_downloads/{id} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Ads Campaigns (Admin/Staff only for write)
+    match /ads_campaigns/{campaignId} {
+      allow read: if true;
+      allow write: if isStaffOrAdmin();
+    }
+
+    // Song Submissions for SBG Music Catalog (Users can submit songs for review; Staff/Admin can review)
+    match /submitted_songs/{subId} {
+      allow create: if isAuthenticated();
+      allow read: if isStaffOrAdmin() || (isAuthenticated() && resource.data.submittedByUid == request.auth.uid);
+      allow update, delete: if isStaffOrAdmin();
+    }
+
+    // Staff accounts collection (Admin/Owner can create/edit staff accounts)
+    match /staff/{staffId} {
+      allow read: if isStaffOrAdmin() || (isAuthenticated() && (request.auth.uid == staffId || (resource.data.email != null && resource.data.email.lower() == request.auth.token.email.lower())));
+      allow write: if isAdmin();
+    }
+
+    // AI Music Studio Quota & Weekly Generation Limits (5 tracks/week per user)
+    match /user_ai_quotas/{userId} {
+      allow read, write: if true;
+    }
+
+    // Analytics collections (Stream counts, watch time, and impressions logged safely; read restricted to staff/admin)
+    match /analytics/{docId} {
+      allow read: if isStaffOrAdmin();
+      allow write: if true;
+    }
+    match /analytics_daily/{date} {
+      allow read: if isStaffOrAdmin();
+      allow write: if true;
+    }
+    match /analytics_songs/{songId} {
+      allow read: if isStaffOrAdmin();
+      allow write: if true;
+    }
+    match /analytics_playlists/{playlistId} {
+      allow read: if isStaffOrAdmin();
+      allow write: if true;
+    }
+    match /analytics_overview/{docId} {
+      allow read: if isStaffOrAdmin();
+      allow write: if true;
+    }
+    match /ads_analytics/{docId} {
+      allow read: if isStaffOrAdmin();
+      allow write: if true;
+    }
+    match /playbackEvents/{eventId} {
+      allow create: if true;
+      allow read: if isStaffOrAdmin();
+      allow update, delete: if isStaffOrAdmin();
+    }
+
+    // App statistics and public counters (Live APK Downloads Counter)
+    match /app_stats/{statId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Fallback rule: deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

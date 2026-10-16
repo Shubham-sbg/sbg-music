@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="sbg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9333ea" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#ec4899" />
+    </linearGradient>
+    <linearGradient id="glow-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#f472b6" stop-opacity="0.8" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="#0c0c12" />
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="url(#sbg-grad)" stroke-width="12" />
+  <!-- Waveform / Musical Note Emblem -->
+  <g transform="translate(100, 100) scale(0.6)">
+    <circle cx="260" cy="260" r="220" fill="url(#sbg-grad)" opacity="0.15" />
+    <path d="M 120 360 C 120 400 80 430 40 400 C 0 370 20 310 80 310 C 100 310 110 320 120 330 L 120 120 C 120 90 140 80 180 90 L 360 140 C 390 150 400 170 400 200 L 400 320 C 400 360 360 390 320 360 C 280 330 300 270 360 270 C 380 270 390 280 400 290 L 400 200 L 120 120 Z" fill="url(#sbg-grad)" />
+    <!-- Pulse Soundwave Bars -->
+    <rect x="180" y="240" width="16" height="80" rx="8" fill="#ffffff" />
+    <rect x="220" y="200" width="16" height="120" rx="8" fill="#ffffff" />
+    <rect x="260" y="180" width="16" height="150" rx="8" fill="#ffffff" />
+    <rect x="300" y="220" width="16" height="90" rx="8" fill="#ffffff" />
+  </g>
+  <text x="256" y="440" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-weight="900" font-size="52" fill="#ffffff" text-anchor="middle" letter-spacing="4">SBG MUSIC</text>
+</svg>

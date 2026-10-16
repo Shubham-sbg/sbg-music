@@ -1,0 +1,16 @@
+{
+  "appName": "SBG MUSIC",
+  "packageName": "com.sbg.music",
+  "versionName": "2.4.0",
+  "versionCode": 20400,
+  "minSdkVersion": 21,
+  "targetSdkVersion": 34,
+  "supportedAndroidVersions": "Android 5.0+ (Lollipop, Marshmallow, Nougat, Oreo, Pie, 10, 11, 12, 13, 14, 15)",
+  "supportedArchitectures": "universal (arm64-v8a, armeabi-v7a, x86_64, x86)",
+  "sizeBytes": 70877,
+  "sizeFormatted": "0.07 MB",
+  "sha256Checksum": "62bef604fcdda9a535152ea9014d8f7ec5700e2c4248d825d37538261c79d825",
+  "signingScheme": "v1 (JAR) + v2 (APK Signature) + v3",
+  "builtAt": "2026-09-30T16:06:59.244Z",
+  "status": "PRODUCTION_VERIFIED_VALID"
+}

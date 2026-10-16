@@ -1,0 +1,320 @@
+{
+  "entities": {
+    "song": {
+      "title": "Song",
+      "description": "A musical track.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "artist": { "type": "string" },
+        "description": { "type": "string" },
+        "genre": { "type": "string" },
+        "releaseDate": { "type": "string" },
+        "durationSeconds": { "type": "number" },
+        "explicitContent": { "type": "boolean" },
+        "audioUrl": { "type": "string" },
+        "youtubeUrl": { "type": "string" },
+        "youtubeVideoId": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "customCoverUrl": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "heroImageUrl": { "type": "string" },
+        "isFeatured": { "type": "boolean" },
+        "featuredBadge": { "type": "string" },
+        "featuredDescription": { "type": "string" },
+        "externalLinkEnabled": { "type": "boolean" },
+        "externalLinkLabel": { "type": "string" },
+        "externalLinkUrl": { "type": "string" },
+        "externalLinks": { "type": "array" },
+        "duration": { "type": "number" },
+        "downloadEnabled": { "type": "boolean" },
+        "published": { "type": "boolean" },
+        "showYoutubeSourceBadge": { "type": "boolean" },
+        "source": { "type": "string" },
+        "sourcePlaylistId": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdById": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["title", "artist", "createdAt"]
+    },
+    "playlist": {
+      "title": "Playlist",
+      "description": "A collection of songs.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "songIds": { "type": "array" },
+        "published": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title"]
+    },
+    "staff": {
+      "title": "Staff Member",
+      "description": "Admin or Staff user configuration.",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "permissions": { "type": "object" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["email", "role"]
+    },
+    "adCampaign": {
+      "title": "Ad Campaign",
+      "description": "Promotional or featured advertisement campaign.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "buttonLabel": { "type": "string" },
+        "destinationUrl": { "type": "string" },
+        "placement": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "impressions": { "type": "number" },
+        "clicks": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "destinationUrl", "placement", "enabled"]
+    },
+    "dailyAnalytics": {
+      "title": "Daily Analytics",
+      "description": "Aggregated daily playback watch time and counts.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "totalPlays": { "type": "number" },
+        "totalListenSeconds": { "type": "number" },
+        "uniqueVisitorsCount": { "type": "number" },
+        "completedCount": { "type": "number" }
+      },
+      "required": ["date"]
+    },
+    "songAnalytics": {
+      "title": "Song Analytics",
+      "description": "Aggregated watch time and metrics per song.",
+      "type": "object",
+      "properties": {
+        "songId": { "type": "string" },
+        "title": { "type": "string" },
+        "artist": { "type": "string" },
+        "totalPlays": { "type": "number" },
+        "totalListenSeconds": { "type": "number" },
+        "completedCount": { "type": "number" },
+        "lastPlayedAt": { "type": "number" }
+      },
+      "required": ["songId"]
+    },
+    "userPlaylist": {
+      "title": "User Playlist",
+      "description": "User created public or private playlist.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "visibility": { "type": "string", "enum": ["public", "private"] },
+        "songCount": { "type": "number" },
+        "coverUrl": { "type": "string" },
+        "items": { "type": "array" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["ownerId", "name", "visibility"]
+    },
+    "userLibraryItem": {
+      "title": "User Library Item",
+      "description": "Personal library item saved by a user from YouTube or SBG catalog.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "songId": { "type": "string" },
+        "youtubeVideoId": { "type": "string" },
+        "title": { "type": "string" },
+        "artist": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "duration": { "type": "number" },
+        "source": { "type": "string", "enum": ["youtube", "sbg"] },
+        "addedAt": { "type": "number" }
+      },
+      "required": ["userId", "title", "source", "addedAt"]
+    },
+    "playbackEvent": {
+      "title": "Playback Event",
+      "description": "Granular record of song play, pause, or completion events.",
+      "type": "object",
+      "properties": {
+        "songId": { "type": "string" },
+        "title": { "type": "string" },
+        "artist": { "type": "string" },
+        "source": { "type": "string" },
+        "eventType": { "type": "string" },
+        "currentTime": { "type": "number" },
+        "duration": { "type": "number" },
+        "playlistId": { "type": "string" },
+        "userId": { "type": "string" },
+        "anonymousId": { "type": "string" },
+        "deviceType": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["songId", "title", "artist", "source", "eventType"]
+    },
+    "realtimeAnalytics": {
+      "title": "Realtime Analytics",
+      "description": "Aggregated real-time metrics including watch time, playback volume, completion rates, and source breakdown.",
+      "type": "object",
+      "properties": {
+        "totalPlays": { "type": "number" },
+        "authenticatedPlays": { "type": "number" },
+        "anonymousPlays": { "type": "number" },
+        "totalWatchTimeSeconds": { "type": "number" },
+        "authenticatedWatchTimeSeconds": { "type": "number" },
+        "anonymousWatchTimeSeconds": { "type": "number" },
+        "totalCompletions": { "type": "number" },
+        "authenticatedCompletions": { "type": "number" },
+        "anonymousCompletions": { "type": "number" },
+        "sourceBreakdown": { "type": "object" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["totalPlays", "totalWatchTimeSeconds"]
+    },
+    "appStat": {
+      "title": "App Statistics",
+      "description": "Public counters such as Android APK downloads.",
+      "type": "object",
+      "properties": {
+        "count": { "type": "number" },
+        "lastDownloadedAt": { "type": "number" }
+      },
+      "required": ["count"]
+    },
+    "userAiQuota": {
+      "title": "User AI Quota",
+      "description": "Weekly generation quota for AI music creation (max 5 tracks per week per user).",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "usedThisWeek": { "type": "number" },
+        "weekStartDate": { "type": "number" },
+        "lastGeneratedAt": { "type": "number" }
+      },
+      "required": ["usedThisWeek", "weekStartDate"]
+    },
+    "submittedSong": {
+      "title": "Submitted Song",
+      "description": "Song submitted by a listener for review and inclusion in SBG Music catalog.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "artist": { "type": "string" },
+        "youtubeVideoId": { "type": "string" },
+        "youtubeUrl": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "submittedByUid": { "type": "string" },
+        "submittedByEmail": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "artist", "submittedByUid", "status"]
+    },
+    "androidRelease": {
+      "title": "Android Release",
+      "description": "Android APK releases with versioning, checksums, and Firebase Storage paths.",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string" },
+        "versionName": { "type": "string" },
+        "versionCode": { "type": "number" },
+        "releaseName": { "type": "string" },
+        "releaseNotes": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "downloadUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileSizeBytes": { "type": "number" },
+        "fileSizeFormatted": { "type": "string" },
+        "sha256": { "type": "string" },
+        "minAndroidVersion": { "type": "string" },
+        "targetAndroidVersion": { "type": "string" },
+        "downloadButtonText": { "type": "string" },
+        "installInstructions": { "type": "string" },
+        "published": { "type": "boolean" },
+        "isDefault": { "type": "boolean" },
+        "downloadCount": { "type": "number" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["appName", "versionName", "downloadUrl", "fileName", "isDefault", "published"]
+    }
+  },
+  "firestore": {
+    "/androidReleases/{releaseId}": {
+      "schema": "androidRelease",
+      "description": "Published and active Android APK releases with download URLs and metadata."
+    },
+    "/songs/{songId}": {
+      "schema": "song",
+      "description": "Musical tracks."
+    },
+    "/submitted_songs/{subId}": {
+      "schema": "submittedSong",
+      "description": "Songs submitted by users for approval."
+    },
+    "/playlists/{playlistId}": {
+      "schema": "playlist",
+      "description": "Collections of songs."
+    },
+    "/staff/{staffId}": {
+      "schema": "staff",
+      "description": "Staff access and roles."
+    },
+    "/ads_campaigns/{campaignId}": {
+      "schema": "adCampaign",
+      "description": "Promotional placements and ads."
+    },
+    "/analytics_daily/{date}": {
+      "schema": "dailyAnalytics",
+      "description": "Daily aggregated watch time and plays."
+    },
+    "/analytics_songs/{songId}": {
+      "schema": "songAnalytics",
+      "description": "Aggregated metrics per song."
+    },
+    "/userPlaylists/{playlistId}": {
+      "schema": "userPlaylist",
+      "description": "User created private or public playlists."
+    },
+    "/users/{userId}/library/{itemId}": {
+      "schema": "userLibraryItem",
+      "description": "Personal library tracks for a user."
+    },
+    "/playbackEvents/{eventId}": {
+      "schema": "playbackEvent",
+      "description": "Unified log of playback started, paused, and completed events."
+    },
+    "/analytics/{docId}": {
+      "schema": "realtimeAnalytics",
+      "description": "Real-time analytics collection holding overview, watch time, and source distribution."
+    },
+    "/app_stats/{statId}": {
+      "schema": "appStat",
+      "description": "Global application stats such as download counts."
+    },
+    "/user_ai_quotas/{userId}": {
+      "schema": "userAiQuota",
+      "description": "Weekly quotas and track limits for AI Music Studio (5 generations/week)."
+    }
+  }
+}

@@ -1,0 +1,14 @@
+node_modules
+.git
+.gitignore
+.env
+.env.*
+.env.local
+dist
+coverage
+logs
+*.log
+*.patch
+patch_*.cjs
+patch_*.sh
+patch_*.js

@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /staff/
+Disallow: /my-playlists
+Disallow: /favorites
+Disallow: /search
+
+Sitemap: https://sbg-song.vercel.app/sitemap.xml

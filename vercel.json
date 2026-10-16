@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/((?!api/|sitemap\\.xml|robots\\.txt|googlee841c8847ecdcbb2\\.html).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

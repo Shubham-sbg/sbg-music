@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#141416" rx="48"/>
+  
+  <!-- Headphones Arc (Band) -->
+  <path d="M120 250 C120 120, 392 120, 392 250" fill="none" stroke="#8B5CF6" stroke-width="32" stroke-linecap="round"/>
+  
+  <!-- Left Ear Cushion (Magenta / Vibrant Pink) -->
+  <rect x="74" y="215" width="68" height="155" rx="34" fill="#D946EF" filter="drop-shadow(0 4px 12px rgba(217, 70, 239, 0.4))"/>
+  <!-- Left Ear Cushion Inner Highlight -->
+  <rect x="92" y="245" width="14" height="75" rx="7" fill="#FDF4FF" opacity="0.9"/>
+
+  <!-- Right Ear Cushion (Magenta / Vibrant Pink) -->
+  <rect x="370" y="215" width="68" height="155" rx="34" fill="#D946EF" filter="drop-shadow(0 4px 12px rgba(217, 70, 239, 0.4))"/>
+  <!-- Right Ear Cushion Inner Highlight -->
+  <rect x="406" y="245" width="14" height="75" rx="7" fill="#FDF4FF" opacity="0.9"/>
+
+  <!-- Text "SBG" in Center -->
+  <text x="256" y="300" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="78" fill="#F3F4F6" letter-spacing="4">SBG</text>
+
+  <!-- Text "M U S I C" below -->
+  <text x="256" y="445" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="36" fill="#A855F7" letter-spacing="18">MUSIC</text>
+</svg>
