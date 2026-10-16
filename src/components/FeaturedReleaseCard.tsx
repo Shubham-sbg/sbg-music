@@ -187,7 +187,7 @@ export default function FeaturedReleaseCard({ release, songs }: FeaturedReleaseC
           </button>
 
           {/* Secondary Official Website Links */}
-          {release.externalLinks?.filter((l) => l.enabled && l.url).map((link) => {
+          {release.externalLinks?.filter((l: any) => l.enabled && l.url).map((link: any) => {
             const validated = sanitizeAndValidateUrl(link.url);
             if (!validated.isValid) return null;
             return (

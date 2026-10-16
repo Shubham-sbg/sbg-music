@@ -141,7 +141,7 @@ export default function AdminAds() {
     setAdType(camp.type || 'banner');
     setStartDate(camp.startDate || '');
     setEndDate(camp.endDate || '');
-    setEnabled(camp.enabled);
+    setEnabled(camp.enabled ?? true);
     setFormError('');
     setModalOpen(true);
   };
@@ -199,7 +199,7 @@ export default function AdminAds() {
 
   const handleToggle = async (camp: AdCampaign) => {
     try {
-      await toggleAdCampaignStatus(camp.id, camp.enabled);
+      await toggleAdCampaignStatus(camp.id, camp.enabled ?? true);
       setCampaigns((prev) =>
         prev.map((c) => (c.id === camp.id ? { ...c, enabled: !c.enabled } : c))
       );
@@ -327,7 +327,7 @@ export default function AdminAds() {
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/5 text-white/60 border border-white/10">
-                            {camp.placement.replace('_', ' ')}
+                            {(camp.placement || 'home_hero').replace('_', ' ')}
                           </span>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
                             camp.enabled 

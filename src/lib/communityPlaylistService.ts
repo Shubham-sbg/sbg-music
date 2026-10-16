@@ -173,7 +173,7 @@ export async function syncOfflineQueue() {
   const q = getOfflineQueue();
   if (q.length === 0) return;
 
-  const successfulIds = [];
+  const successfulIds: string[] = [];
 
   for (const item of q) {
     try {

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useRef, ReactNode, useEffect, useCallback } from 'react';
-import ReactPlayer from 'react-player';
 import { Song, AdCampaign } from '../types';
 import { extractYoutubeVideoId } from '../lib/youtube';
 import { flushPlaybackAnalytics } from '../lib/analytics';
@@ -21,25 +20,11 @@ import {
   recordVoiceAdCompletion 
 } from '../lib/ads';
 import { autoCacheActiveTrack } from '../services/offlineMusicService';
-import { getOfflineSongBlobUrl, resolveOfflineSongBlobUrl, isSongDownloaded } from '../services/offlineStorageService';
-import { getDataSaverSettings, subscribeToDataSaver, DataSaverSettings } from '../services/dataSaverService';
-import DataSaverModal from '../components/DataSaverModal';
-import { hasLrcTimestamps } from '../utils/lyricsParser';
+import { getOfflineSongBlobUrl } from '../services/offlineStorageService';
+import { Minimize2, Maximize2, X, Radio, AlertCircle, RefreshCw } from 'lucide-react';
 
-const PlayerComponent = ReactPlayer as any;
-
-export type PlaybackLifecycleState = 'idle' | 'loading' | 'buffering' | 'playing' | 'paused' | 'ended' | 'error' | 'offline';
+export type PlaybackLifecycleState = 'idle' | 'loading' | 'buffering' | 'playing' | 'paused' | 'ended' | 'error';
 export type TrackSourceType = 'direct' | 'youtube';
-export type NetworkPlaybackStatus = 
-  | 'idle' 
-  | 'connecting' 
-  | 'loading' 
-  | 'buffering' 
-  | 'slow_connection' 
-  | 'reconnecting' 
-  | 'offline' 
-  | 'error';
-export type PlaybackSourceBadge = 'Downloaded / Offline' | 'Online streaming' | 'YouTube';
 
 export interface PlaybackDiagnosticInfo {
   diagnosticId: string;
@@ -128,14 +113,8 @@ export interface PlayerContextType {
   shareToast: string | null;
   repeatMode: 'off' | 'all' | 'one';
   toggleRepeatMode: () => void;
-  networkStatus: NetworkPlaybackStatus;
-  networkStatusText: string | null;
-  currentSourceBadge: PlaybackSourceBadge;
-  dataSaverSettings: DataSaverSettings;
-  isDataSaverModalOpen: boolean;
-  openDataSaverModal: () => void;
-  closeDataSaverModal: () => void;
-  toggleDataSaver: () => void;
+  audioMode: string;
+  setAudioMode: (mode: string) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -156,6 +135,7 @@ export function getTrackSourceType(song: Song | null): TrackSourceType {
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
+  const [audioMode, setAudioMode] = useState<string>('normal');
   const [queue, setQueue] = useState<Song[]>([]);
   const [originalQueue, setOriginalQueue] = useState<Song[]>([]);
   const [isShuffle, setIsShuffle] = useState<boolean>(() => {
@@ -176,103 +156,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [diagnosticInfo, setDiagnosticInfo] = useState<PlaybackDiagnosticInfo | null>(null);
   
-  // Network Status and Buffering UI States
-  const [networkStatus, setNetworkStatus] = useState<NetworkPlaybackStatus>('idle');
-  const [networkStatusText, setNetworkStatusText] = useState<string | null>(null);
-  const [currentSourceBadge, setCurrentSourceBadge] = useState<PlaybackSourceBadge>('Online streaming');
-  const isRecoveringFromDisconnectRef = useRef<boolean>(false);
-  const localBlobUrlCacheRef = useRef<Map<string, string>>(new Map());
-
-  // Data Saver Integration
-  const [dataSaverSettings, setDataSaverSettings] = useState<DataSaverSettings>(() => getDataSaverSettings());
-  const [isDataSaverModalOpen, setIsDataSaverModalOpen] = useState(false);
-
-  const openDataSaverModal = useCallback(() => setIsDataSaverModalOpen(true), []);
-  const closeDataSaverModal = useCallback(() => setIsDataSaverModalOpen(false), []);
-  const toggleDataSaver = useCallback(() => {
-    import('../services/dataSaverService').then(({ saveDataSaverSettings }) => {
-      saveDataSaverSettings({ dataSaver: !dataSaverSettings.dataSaver });
-    });
-  }, [dataSaverSettings.dataSaver]);
-
-  // Network Connectivity and Data Saver subscription
-  useEffect(() => {
-    const unsubDataSaver = subscribeToDataSaver((newSettings) => {
-      setDataSaverSettings(newSettings);
-    });
-
-    const handleOnline = () => {
-      if (isRecoveringFromDisconnectRef.current && currentSong) {
-        setNetworkStatus('reconnecting');
-        setNetworkStatusText('Reconnecting…');
-        setTimeout(() => {
-          if (currentSong && audioRef.current && isPlaying) {
-            audioRef.current.play().catch(() => {});
-          }
-          isRecoveringFromDisconnectRef.current = false;
-          setNetworkStatus('idle');
-          setNetworkStatusText(null);
-        }, 1200);
-      } else {
-        setNetworkStatus('idle');
-        setNetworkStatusText(null);
-      }
-    };
-
-    const handleOffline = () => {
-      if (isPlaying || isLoading || isBuffering) {
-        const localBlob = localBlobUrlCacheRef.current.get(currentSong?.id || '') || getOfflineSongBlobUrl(currentSong?.id || '');
-        if (localBlob && audioRef.current) {
-          if (audioRef.current.src !== localBlob) {
-            const currentPos = audioRef.current.currentTime || progress;
-            audioRef.current.src = localBlob;
-            audioRef.current.currentTime = currentPos;
-            audioRef.current.play().catch(() => {});
-            setCurrentSourceBadge('Downloaded / Offline');
-            setNetworkStatus('idle');
-            setNetworkStatusText(null);
-            return;
-          }
-        }
-        isRecoveringFromDisconnectRef.current = true;
-        setNetworkStatus('reconnecting');
-        setNetworkStatusText('Connection lost — reconnecting…');
-      } else {
-        setNetworkStatus('offline');
-        setNetworkStatusText('Offline mode');
-      }
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // Monitor slow mobile network conditions if NetworkInformation API is supported
-    const navConn = (typeof navigator !== 'undefined' ? (navigator as any).connection : null);
-    const checkNetworkCondition = () => {
-      if (navConn && (isPlaying || isBuffering)) {
-        if (navConn.effectiveType === '2g' || navConn.effectiveType === 'slow-2g' || (navConn.downlink && navConn.downlink < 0.4)) {
-          setNetworkStatus('slow_connection');
-          setNetworkStatusText('Slow internet connection');
-        }
-      }
-    };
-
-    if (navConn && navConn.addEventListener) {
-      navConn.addEventListener('change', checkNetworkCondition);
-    }
-
-    return () => {
-      unsubDataSaver();
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      if (navConn && navConn.removeEventListener) {
-        navConn.removeEventListener('change', checkNetworkCondition);
-      }
-    };
-  }, [currentSong, isPlaying, isLoading, isBuffering, progress]);
-  
-  // YouTube Dock View State
-  const [isYoutubeDockVisible, setIsYoutubeDockVisible] = useState(true);
+  // YouTube Dock View State (Deprecated - floating dock removed)
+  const [isYoutubeDockVisible, setIsYoutubeDockVisible] = useState(false);
   const [isYoutubeDockMinimized, setIsYoutubeDockMinimized] = useState(false);
 
   // Native Audio & YouTube Player References
@@ -541,21 +426,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Check if song already has timestamped lyrics in syncedLyrics or lyrics
-    const songHasSynced = Boolean(song.syncedLyrics && hasLrcTimestamps(song.syncedLyrics));
-    const lyricsHasSynced = Boolean(song.lyrics && hasLrcTimestamps(song.lyrics));
-
-    if (songHasSynced || lyricsHasSynced) {
-      setLyrics(song.lyrics || song.syncedLyrics || null);
-      setSyncedLyrics(songHasSynced ? song.syncedLyrics! : song.lyrics!);
-      setLyricsError(null);
-      setIsLyricsLoading(false);
-      return;
-    }
-
     if (song.lyrics) {
       setLyrics(song.lyrics);
-      setSyncedLyrics(null);
+      setSyncedLyrics(song.syncedLyrics || null);
       setLyricsError(null);
       setIsLyricsLoading(false);
       return;
@@ -845,8 +718,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       watchTimeRef.current.lastActiveTimestamp = Date.now();
     }
 
-    const safeDuration = duration > 0 ? duration : (currentSong?.durationSeconds || currentSong?.duration || 9999);
-    const safeTime = Math.max(0, Math.min(time, safeDuration));
+    const safeTime = Math.max(0, Math.min(time, duration || 9999));
     setProgress(safeTime);
 
     if (currentSourceType === 'direct' && audioRef.current) {
@@ -866,7 +738,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         console.warn('[YouTube Seek Error]:', e);
       }
     }
-  }, [currentSourceType, duration, currentSong, isPlaying]);
+  }, [currentSourceType, duration, isPlaying]);
 
   // Throttled position saving
   const handleThrottledPositionSave = useCallback((currentTime: number) => {
@@ -879,85 +751,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('sbg_continue_listening', JSON.stringify({
           song: currentSong,
           progress: currentTime,
-          duration,
-          timestamp: Date.now(),
+          duration: duration,
+          timestamp: now,
         }));
         window.dispatchEvent(new Event('continue_listening_updated'));
       } catch {}
     }
   }, [currentSong, duration]);
 
-  // Continuous smooth playback position synchronization loop
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    let animId: number;
-    let lastReportedSec = -1;
-
-    const tick = () => {
-      let currentPos: number | null = null;
-      let currentDur: number | null = null;
-
-      if (currentSourceType === 'direct' && audioRef.current) {
-        const audio = audioRef.current;
-        if (!audio.paused && typeof audio.currentTime === 'number' && !isNaN(audio.currentTime)) {
-          currentPos = audio.currentTime;
-          if (audio.duration && !isNaN(audio.duration) && audio.duration > 0) {
-            currentDur = audio.duration;
-          }
-        }
-      } else if (currentSourceType === 'youtube' && youtubePlayerRef.current) {
-        try {
-          const yt = youtubePlayerRef.current;
-          if (typeof yt.getCurrentTime === 'function') {
-            const t = yt.getCurrentTime();
-            if (typeof t === 'number' && !isNaN(t) && t >= 0) {
-              currentPos = t;
-            }
-          } else if (typeof yt.currentTime === 'number' && !isNaN(yt.currentTime)) {
-            currentPos = yt.currentTime;
-          }
-
-          if (typeof yt.getDuration === 'function') {
-            const d = yt.getDuration();
-            if (typeof d === 'number' && !isNaN(d) && d > 0) {
-              currentDur = d;
-            }
-          }
-        } catch {}
-      }
-
-      if (currentPos !== null && !isNaN(currentPos)) {
-        // Sample position with sub-second responsiveness (approx 12 updates per second)
-        // so elapsed time timer advances every second and progress slider advances smoothly
-        if (Math.abs(currentPos - lastReportedSec) >= 0.08) {
-          lastReportedSec = currentPos;
-          setProgress(currentPos);
-          handleThrottledPositionSave(currentPos);
-        }
-      }
-
-      if (currentDur !== null && (!duration || Math.abs(currentDur - duration) > 1)) {
-        setDuration(currentDur);
-      }
-
-      animId = requestAnimationFrame(tick);
-    };
-
-    animId = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(animId);
-    };
-  }, [isPlaying, currentSourceType, duration, handleThrottledPositionSave]);
-
   // ================= Direct Audio Engine Callbacks =================
   const handleNativeLoadStart = () => {
     setIsLoading(true);
     setPlaybackState('loading');
     setPlaybackError(null);
-    setNetworkStatus('loading');
-    setNetworkStatusText('Loading song…');
   };
 
   const handleNativeLoadedMetadata = (e: React.SyntheticEvent<HTMLAudioElement>) => {
@@ -972,8 +778,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const handleNativeCanPlay = () => {
     setIsLoading(false);
     setIsBuffering(false);
-    setNetworkStatus('idle');
-    setNetworkStatusText(null);
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current);
       retryTimeoutRef.current = null;
@@ -990,8 +794,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
     setIsBuffering(false);
     setPlaybackState('playing');
-    setNetworkStatus('idle');
-    setNetworkStatusText(null);
     watchTimeRef.current.lastActiveTimestamp = Date.now();
     retryCountRef.current = 0;
     if (retryTimeoutRef.current) {
@@ -1001,7 +803,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     checkAndApplyResume();
 
     if (currentSong) {
-      // NOTE: Removed autoCacheActiveTrack to prevent duplicate audio requests & respect user data limits
+      autoCacheActiveTrack(currentSong);
       try {
         const stored = localStorage.getItem('sbg_recently_played');
         let recent = stored ? JSON.parse(stored) : [];
@@ -1016,8 +818,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const handleNativeWaiting = () => {
     setIsBuffering(true);
     setPlaybackState('buffering');
-    setNetworkStatus('buffering');
-    setNetworkStatusText('Buffering…');
     if (watchTimeRef.current.lastActiveTimestamp) {
       const elapsed = (Date.now() - watchTimeRef.current.lastActiveTimestamp) / 1000;
       if (elapsed > 0 && elapsed < 120) {
@@ -1031,15 +831,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setIsBuffering(true);
     setPlaybackState('buffering');
 
-    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-    if (isOffline) {
-      setNetworkStatus('reconnecting');
-      setNetworkStatusText('Connection lost — reconnecting…');
-    } else {
-      setNetworkStatus('buffering');
-      setNetworkStatusText('Buffering…');
-    }
-
     // Bounded retry policy: wait 3.5s for natural browser buffer recovery
     if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
     retryTimeoutRef.current = setTimeout(() => {
@@ -1048,16 +839,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         retryCountRef.current += 1;
         const currentPos = audio.currentTime || 0;
         console.log(`[Audio Engine] Bounded recovery attempt ${retryCountRef.current}/3 at position ${currentPos.toFixed(1)}s`);
-        setNetworkStatus('reconnecting');
-        setNetworkStatusText('Reconnecting…');
         audio.load();
         audio.currentTime = currentPos;
         audio.play().catch(() => {});
       } else if (retryCountRef.current >= 3) {
         setPlaybackState('error');
-        setNetworkStatus('error');
-        setNetworkStatusText('Playback failed — Retry');
-        setPlaybackError('Network connection is unstable. Tap retry to restart playback.');
+        setPlaybackError('Network connection is unstable. Tap play to retry.');
         recordDiagnostic('STALLED_MAX_RETRIES', 'Stream stalled and exceeded retry threshold.');
       }
     }, 3500);
@@ -1084,12 +871,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     watchTimeRef.current.lastActiveTimestamp = null;
     setPlaybackState('paused');
 
-    // Strict rule: Do not show a network warning merely because a song is paused or has ended.
-    if (networkStatus !== 'offline') {
-      setNetworkStatus('idle');
-      setNetworkStatusText(null);
-    }
-
     if (currentSong) {
       recordPlaybackPause(currentSong, {
         playlistId: activePlaylistId,
@@ -1114,31 +895,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const audio = e.currentTarget;
     const mediaErr = audio.error;
     let errCode: string | number = mediaErr?.code || 'UNKNOWN';
-    let userMsg = 'Playback failed — Retry';
+    let userMsg = 'Unable to play this track. Please check connection and try again.';
 
-    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-    if (isOffline) {
-      userMsg = 'Connect to the internet to stream this song.';
-      setNetworkStatus('offline');
-      setNetworkStatusText('Offline mode');
-    } else {
-      if (mediaErr?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-        userMsg = 'This audio source is unavailable or unsupported on this device.';
-      } else if (mediaErr?.code === MediaError.MEDIA_ERR_NETWORK) {
-        userMsg = 'Network error while streaming audio. Reconnecting…';
-        setNetworkStatus('reconnecting');
-        setNetworkStatusText('Reconnecting…');
-      } else if (mediaErr?.code === MediaError.MEDIA_ERR_DECODE) {
-        userMsg = 'Audio decoding error on this device.';
-      }
-      setNetworkStatus('error');
-      setNetworkStatusText('Playback failed — Retry');
+    if (mediaErr?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+      userMsg = 'This audio source is unavailable or unsupported on this device.';
+    } else if (mediaErr?.code === MediaError.MEDIA_ERR_NETWORK) {
+      userMsg = 'Network error while streaming audio. Reconnecting…';
+    } else if (mediaErr?.code === MediaError.MEDIA_ERR_DECODE) {
+      userMsg = 'Audio decoding error on this device.';
     }
 
     recordDiagnostic(errCode, userMsg);
     setIsLoading(false);
     setIsBuffering(false);
-    setPlaybackState(isOffline ? 'offline' : 'error');
+    setPlaybackState('error');
     setPlaybackError(userMsg);
   };
 
@@ -1309,7 +1079,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   };
 
   // Play Song authoritative transition
-  const playSong = async (song: Song, newQueue?: Song[], playlistId?: string, resumeTime?: number, explicitSource?: string) => {
+  const playSong = (song: Song, newQueue?: Song[], playlistId?: string, resumeTime?: number, explicitSource?: string) => {
     if (currentSong && currentSong.id !== song.id && progress > 3 && (duration - progress > 4)) {
       saveSongPlaybackPosition(currentSong.id, progress, duration);
     }
@@ -1322,44 +1092,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setPlaybackError(null);
     setDiagnosticInfo(null);
     setIsPlayerDismissed(false);
-    retryCountRef.current = 0;
-
-    // 1. PLAYBACK SOURCE PRIORITY & OFFLINE RESOLUTION
-    // Check if eligible local download exists on user device
-    let localBlobUrl = localBlobUrlCacheRef.current.get(song.id) || getOfflineSongBlobUrl(song.id);
-    if (!localBlobUrl) {
-      localBlobUrl = await resolveOfflineSongBlobUrl(song.id);
-      if (localBlobUrl) {
-        localBlobUrlCacheRef.current.set(song.id, localBlobUrl);
-      }
-    }
-
-    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-
-    // Rule 3: If offline and NO local download file exists, show clear message and stop
-    if (isOffline && !localBlobUrl) {
-      setCurrentSong(song);
-      setIsPlaying(false);
-      setIsLoading(false);
-      setIsBuffering(false);
-      setPlaybackState('offline');
-      setNetworkStatus('offline');
-      setNetworkStatusText('Offline mode');
-      setPlaybackError('Connect to the internet to stream this song.');
-      setCurrentSourceBadge('Online streaming');
-      return;
-    }
-
-    // Set appropriate source badge
-    if (localBlobUrl) {
-      setCurrentSourceBadge('Downloaded / Offline');
-    } else {
-      const isYt = song.source === 'youtube' || Boolean(song.youtubeVideoId) || (song.youtubeUrl && (song.youtubeUrl.includes('youtube') || song.youtubeUrl.includes('youtu.be')));
-      setCurrentSourceBadge(isYt ? 'YouTube' : 'Online streaming');
-    }
-
-    setNetworkStatus('connecting');
-    setNetworkStatusText('Connecting…');
 
     if (watchTimeRef.current.song && watchTimeRef.current.song.id !== song.id) {
       flushWatchTime(false);
@@ -1369,9 +1101,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setActivePlaylistId(playlistId);
     }
 
-    const nextSourceType = localBlobUrl ? 'direct' : getTrackSourceType(song);
+    const nextSourceType = getTrackSourceType(song);
     const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
-    let detectedSource = explicitSource || (localBlobUrl ? 'Offline Storage' : 'Home');
+    let detectedSource = explicitSource || 'Home';
 
     if (!explicitSource) {
       if (playlistId || currentPath.includes('/playlist')) detectedSource = 'Playlist';
@@ -1392,14 +1124,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       isCompleted: false,
     };
 
-    if (!isOffline) {
-      recordPlaybackStart(song, {
-        playlistId: playlistId || activePlaylistId,
-        playbackSource: detectedSource,
-        currentTime: typeof resumeTime === 'number' && resumeTime > 0 ? resumeTime : 0,
-      }, { immediate: true }).catch(() => {});
-      watchTimeRef.current.hasFlushedPlayStart = true;
-    }
+    recordPlaybackStart(song, {
+      playlistId: playlistId || activePlaylistId,
+      playbackSource: detectedSource,
+      currentTime: typeof resumeTime === 'number' && resumeTime > 0 ? resumeTime : 0,
+    }, { immediate: true }).catch(() => {});
+    watchTimeRef.current.hasFlushedPlayStart = true;
 
     if (newQueue && newQueue.length > 0) {
       setQueue(newQueue);
@@ -1422,27 +1152,27 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Engine cleanup when changing source type
-    if (currentSourceType === 'direct' && nextSourceType === 'youtube') {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.removeAttribute('src');
-        audioRef.current.load();
+    // If track is a YouTube-only video, open on YouTube with official video, player, and attribution
+    if (nextSourceType === 'youtube') {
+      const ytUrl = song.youtubeUrl || (song.youtubeVideoId ? `https://www.youtube.com/watch?v=${song.youtubeVideoId}` : '');
+      if (ytUrl) {
+        window.open(ytUrl, '_blank', 'noopener,noreferrer');
+        setShareToast(`Opening "${song.title}" on YouTube...`);
+        setTimeout(() => setShareToast(null), 3000);
       }
+      return;
     }
 
     setIsLoading(true);
     setPlaybackState('loading');
-    setNetworkStatus('loading');
-    setNetworkStatusText('Loading song…');
     setCurrentSong(song);
     setIsPlaying(true);
     setProgress(0);
     setDuration(song.durationSeconds || song.duration || 0);
 
-    // If next is direct audio or offline blob, prepare audio element immediately
+    // If next is direct audio, prepare audio element immediately
     if (nextSourceType === 'direct') {
-      const url = localBlobUrl || getPlayableUrl(song);
+      const url = getPlayableUrl(song);
       if (audioRef.current && url) {
         audioRef.current.src = url;
         audioRef.current.playbackRate = playbackRate;
@@ -1659,22 +1389,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setDiagnosticInfo(null);
     setIsLoading(true);
     setPlaybackState('loading');
-    setNetworkStatus('loading');
-    setNetworkStatusText('Loading song…');
     retryCountRef.current = 0;
-
-    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-    const localBlob = localBlobUrlCacheRef.current.get(currentSong.id) || getOfflineSongBlobUrl(currentSong.id);
-
-    if (isOffline && !localBlob) {
-      setIsLoading(false);
-      setIsPlaying(false);
-      setPlaybackState('offline');
-      setNetworkStatus('offline');
-      setNetworkStatusText('Offline mode');
-      setPlaybackError('Connect to the internet to stream this song.');
-      return;
-    }
 
     if (currentSourceType === 'direct' && audioRef.current) {
       const cur = progress;
@@ -1963,23 +1678,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         shareToast,
         repeatMode,
         toggleRepeatMode,
-        networkStatus,
-        networkStatusText,
-        currentSourceBadge,
-        dataSaverSettings,
-        isDataSaverModalOpen,
-        openDataSaverModal,
-        closeDataSaverModal,
-        toggleDataSaver,
+        audioMode,
+        setAudioMode,
       }}
     >
       {children}
-
-      {/* Data Saver Settings Modal */}
-      <DataSaverModal
-        isOpen={isDataSaverModalOpen}
-        onClose={closeDataSaverModal}
-      />
 
       {/* Share Toast */}
       {shareToast && (
@@ -2002,11 +1705,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         onWaiting={handleNativeWaiting}
         onStalled={handleNativeStalled}
         onTimeUpdate={handleNativeTimeUpdate}
-        onSeeked={(e) => {
-          if (typeof e.currentTarget.currentTime === 'number' && !isNaN(e.currentTarget.currentTime)) {
-            setProgress(e.currentTarget.currentTime);
-          }
-        }}
         onDurationChange={handleNativeDurationChange}
         onPause={handleNativePause}
         onEnded={handleEnded}
@@ -2014,52 +1712,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         style={{ display: 'none' }}
       />
 
-      {/* 
-        Off-screen YouTube audio engine
-        Provides seamless background audio playback of YouTube tracks without rendering a floating video overlay
-      */}
-      {currentSong && currentSourceType === 'youtube' && playableUrl && (
-        <div
-          aria-hidden="true"
-          className="fixed -top-[9999px] -left-[9999px] w-[200px] h-[200px] opacity-0 pointer-events-none overflow-hidden"
-        >
-          <PlayerComponent
-            ref={youtubePlayerRef}
-            src={playableUrl}
-            url={playableUrl}
-            playing={isPlaying}
-            volume={effectiveVolume}
-            playbackRate={playbackRate}
-            progressInterval={200}
-            width="100%"
-            height="100%"
-            onReady={handleYoutubeReady}
-            onStart={handleYoutubeStart}
-            onPlay={handleYoutubePlay}
-            onPause={handleYoutubePause}
-            onWaiting={handleYoutubeWaiting}
-            onPlaying={handleYoutubePlaying}
-            onProgress={handleYoutubeProgress}
-            onDuration={handleYoutubeDuration}
-            onEnded={handleEnded}
-            onError={handleYoutubeError}
-            config={{
-              youtube: {
-                playerVars: {
-                  autoplay: 1,
-                  playsinline: 1,
-                  controls: 0,
-                  disablekb: 1,
-                  modestbranding: 1,
-                  rel: 0,
-                  showinfo: 0,
-                  iv_load_policy: 3,
-                },
-              },
-            }}
-          />
-        </div>
-      )}
     </PlayerContext.Provider>
   );
 }

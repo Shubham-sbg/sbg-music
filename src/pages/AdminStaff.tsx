@@ -77,7 +77,7 @@ export default function AdminStaff() {
     setEmail(staff.email || '');
     setPassword(staff.password || '');
     setRole(staff.role === 'owner' || staff.role === 'admin' ? staff.role : 'staff');
-    setStatusState(staff.status || 'active');
+    setStatusState(staff.status === 'disabled' ? 'disabled' : 'active');
     setPermissions(staff.permissions || DEFAULT_STAFF_PERMISSIONS);
     setFormError('');
     setShowAddModal(true);

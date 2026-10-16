@@ -59,8 +59,8 @@ export default function MyPlaylists() {
       const list = await getUserPlaylists(ownerId);
       
       list.sort((a, b) => {
-        const timeA = a.updatedAt?.toMillis ? a.updatedAt.toMillis() : (a.createdAt?.toMillis ? a.createdAt.toMillis() : 0);
-        const timeB = b.updatedAt?.toMillis ? b.updatedAt.toMillis() : (b.createdAt?.toMillis ? b.createdAt.toMillis() : 0);
+        const timeA = typeof a.updatedAt === 'number' ? a.updatedAt : ((a.updatedAt as any)?.toMillis ? (a.updatedAt as any).toMillis() : (typeof a.createdAt === 'number' ? a.createdAt : ((a.createdAt as any)?.toMillis?.() || 0)));
+        const timeB = typeof b.updatedAt === 'number' ? b.updatedAt : ((b.updatedAt as any)?.toMillis ? (b.updatedAt as any).toMillis() : (typeof b.createdAt === 'number' ? b.createdAt : ((b.createdAt as any)?.toMillis?.() || 0)));
         return timeB - timeA;
       });
       setPlaylists(list);

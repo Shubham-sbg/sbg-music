@@ -275,7 +275,7 @@ export default function AdminPlaylists({ onSwitchToImport }: { onSwitchToImport?
     if (!activePlaylist) return;
     if (confirm(`Remove "${songTitle}" from playlist "${activePlaylist.title}"? \n\nNote: This will only remove the song from this playlist. The song will remain in the SBG music catalog.`)) {
       try {
-        const updatedIds = (activePlaylist.songIds || []).filter((id) => id !== songId);
+        const updatedIds = (activePlaylist.songIds || []).filter((id: string) => id !== songId);
         await updateDoc(doc(db, 'playlists', activePlaylist.id), {
           songIds: updatedIds,
           updatedAt: serverTimestamp(),

@@ -149,7 +149,7 @@ export async function addSongToUserPlaylist(
     const targetVideoId = songItem.youtubeVideoId;
     const targetSongId = songItem.songId;
     const exists = items.some(
-      it => (targetVideoId && it.youtubeVideoId === targetVideoId) ||
+      (it: UserPlaylistItem) => (targetVideoId && it.youtubeVideoId === targetVideoId) ||
             (targetSongId && it.songId === targetSongId) ||
             it.id === songItem.id
     );
@@ -205,7 +205,7 @@ export async function removeSongFromUserPlaylist(
     if (data.ownerId !== ownerId) return { success: false, error: 'Unauthorized' };
 
     const items = (data.items || []).filter(
-      it => it.id !== itemId && it.youtubeVideoId !== itemId && it.songId !== itemId
+      (it: UserPlaylistItem) => it.id !== itemId && it.youtubeVideoId !== itemId && it.songId !== itemId
     );
 
     await updateDoc(pRef, {

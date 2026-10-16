@@ -17,7 +17,7 @@ import { usePlayer } from '../context/PlayerContext';
 export default function Navigation() {
   const navigate = useNavigate();
   const { user, loginGuest, logout } = useAuth();
-  const { audioMode, setAudioMode, isPlaying } = usePlayer();
+  const { audioMode = 'normal', setAudioMode, isPlaying } = usePlayer();
 
   const navLinks = [
     { to: '/', label: 'Home', icon: Home },
@@ -67,7 +67,7 @@ export default function Navigation() {
         <div className="flex items-center gap-2.5">
           {/* Quick Voice Booster Toggle */}
           <button
-            onClick={() => setAudioMode(audioMode === 'vocal_boost' ? 'normal' : 'vocal_boost')}
+            onClick={() => setAudioMode?.(audioMode === 'vocal_boost' ? 'normal' : 'vocal_boost')}
             className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
               audioMode === 'vocal_boost'
                 ? 'bg-purple-600/30 border-purple-500 text-purple-200 shadow-md shadow-purple-900/40'
@@ -185,7 +185,7 @@ export default function Navigation() {
               <span className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-emerald-400 animate-pulse' : 'bg-white/40'}`} />
               Audio Pipeline
             </span>
-            <span className="text-[10px] text-purple-400 font-bold uppercase">{audioMode.replace('_', ' ')}</span>
+            <span className="text-[10px] text-purple-400 font-bold uppercase">{(audioMode || 'normal').replace('_', ' ')}</span>
           </div>
           <p className="text-[10px] text-white/40 leading-relaxed">
             Continuous background audio stream active with stall recovery.

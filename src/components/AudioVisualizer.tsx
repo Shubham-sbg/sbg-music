@@ -6,6 +6,8 @@ interface AudioVisualizerProps {
   barCount?: number;
   className?: string;
   color?: string;
+  height?: number;
+  width?: number;
 }
 
 export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
@@ -13,6 +15,8 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   barCount = 16,
   className = 'h-6 flex items-end gap-0.5',
   color = '#f59e0b',
+  height: customHeight,
+  width: customWidth,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameId = useRef<number | null>(null);
@@ -76,10 +80,12 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   return (
     <canvas
       ref={canvasRef}
-      width={barCount * 4}
-      height={28}
+      width={customWidth || barCount * 4}
+      height={customHeight || 28}
       className={className}
       aria-hidden="true"
     />
   );
 };
+
+export default AudioVisualizer;

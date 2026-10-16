@@ -166,7 +166,7 @@ export default function DownloadApp() {
     }
     return activeRelease.releaseNotes
       .split('\n')
-      .map((s) => s.replace(/^[•\-\*]\s*/, '').trim())
+      .map((s: string) => s.replace(/^[•\-\*]\s*/, '').trim())
       .filter(Boolean);
   })();
 
@@ -194,9 +194,9 @@ export default function DownloadApp() {
     }
     return activeRelease.installInstructions
       .split('\n')
-      .map((line) => line.replace(/^[0-9]+[\.\)]\s*/, '').trim())
+      .map((line: string) => line.replace(/^[0-9]+[\.\)]\s*/, '').trim())
       .filter(Boolean)
-      .map((line) => {
+      .map((line: string) => {
         const parts = line.split(':');
         if (parts.length > 1) {
           return { title: parts[0].trim(), text: parts.slice(1).join(':').trim() };
@@ -372,7 +372,7 @@ export default function DownloadApp() {
             <span>What's New in v{activeRelease.versionName}</span>
           </h3>
           <ul className="space-y-2.5 text-xs sm:text-sm text-white/70 min-w-0">
-            {releaseNotesList.map((note, idx) => (
+            {releaseNotesList.map((note: string, idx: number) => (
               <li key={idx} className="flex items-start gap-2.5 min-w-0 break-words">
                 <CheckCircle2 size={15} className="text-purple-400 shrink-0 mt-0.5" />
                 <span className="min-w-0 break-words leading-relaxed">{note}</span>
@@ -387,7 +387,7 @@ export default function DownloadApp() {
             <span>How to Install on Android</span>
           </h3>
           <ol className="space-y-2.5 text-xs sm:text-sm text-white/70 list-decimal list-inside min-w-0">
-            {installInstructionsList.map((item, idx) => (
+            {installInstructionsList.map((item: any, idx: number) => (
               <li key={idx} className="leading-relaxed min-w-0 break-words">
                 {item.title ? <strong className="text-white">{item.title}: </strong> : null}
                 <span className="break-words">{item.text}</span>

@@ -72,7 +72,7 @@ export default function CopyPlaylistModal({
       const currentUserId = user.uid || (user as any).id;
       const ownerName = user.displayName || user.email?.split('@')[0] || 'User';
 
-      const items = (playlist.items || []).map((item) => ({
+      const items = (playlist.items || []).map((item: any) => ({
         ...item,
         addedAt: new Date().toISOString(),
       }));

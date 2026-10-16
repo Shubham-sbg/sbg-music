@@ -39,8 +39,9 @@ export async function getNavigationVisibility(forceRefresh = false): Promise<Nav
     const raw = localStorage.getItem(CACHE_KEY);
     if (raw && !forceRefresh) {
       const parsed = JSON.parse(raw);
-      inMemoryCache = { ...DEFAULT_NAVIGATION_VISIBILITY, ...parsed };
-      return inMemoryCache;
+      const res: NavigationVisibilitySettings = { ...DEFAULT_NAVIGATION_VISIBILITY, ...parsed };
+      inMemoryCache = res;
+      return res;
     }
   } catch {}
 
@@ -48,11 +49,12 @@ export async function getNavigationVisibility(forceRefresh = false): Promise<Nav
     const snap = await getDoc(doc(db, 'settings', 'navigationVisibility'));
     if (snap.exists()) {
       const data = snap.data();
-      inMemoryCache = { ...DEFAULT_NAVIGATION_VISIBILITY, ...data };
+      const res: NavigationVisibilitySettings = { ...DEFAULT_NAVIGATION_VISIBILITY, ...data };
+      inMemoryCache = res;
       try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(inMemoryCache));
+        localStorage.setItem(CACHE_KEY, JSON.stringify(res));
       } catch {}
-      return inMemoryCache;
+      return res;
     }
   } catch (err) {
     console.warn('Failed to load navigation visibility from Firestore, using defaults:', err);

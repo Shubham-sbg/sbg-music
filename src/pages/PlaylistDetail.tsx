@@ -95,7 +95,7 @@ export default function PlaylistDetail() {
 
               <div className="flex items-center gap-3 shrink-0">
                 <span className="text-xs font-mono text-white/40">
-                  {Math.floor(song.duration / 60)}:{(song.duration % 60).toString().padStart(2, '0')}
+                  {Math.floor((song.duration || 0) / 60)}:{((song.duration || 0) % 60).toString().padStart(2, '0')}
                 </span>
                 <button
                   onClick={(e) => {

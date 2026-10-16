@@ -1263,7 +1263,7 @@ export default function AdminSongs({ onSwitchToImport }: { onSwitchToImport?: ()
 
                     {/* Published Toggle */}
                     <button
-                      onClick={() => togglePublish(song.id, song.published)}
+                      onClick={() => togglePublish(song.id, Boolean(song.published))}
                       className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-colors ${
                         song.published
                           ? 'border-green-500/30 text-green-400 bg-green-500/10'

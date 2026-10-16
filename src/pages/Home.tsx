@@ -170,7 +170,7 @@ export default function Home() {
 
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="text-[11px] font-mono text-white/40 hidden sm:inline">
-                    {Math.floor(song.duration / 60)}:{(song.duration % 60).toString().padStart(2, '0')}
+                    {Math.floor((song.duration || 0) / 60)}:{((song.duration || 0) % 60).toString().padStart(2, '0')}
                   </span>
                   <button
                     onClick={(e) => {

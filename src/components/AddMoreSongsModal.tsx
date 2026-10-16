@@ -132,19 +132,20 @@ export default function AddMoreSongsModal({
   };
 
   // Convert Favorites into items
-  const favoriteItems: UserPlaylistItem[] = Array.from(favorites).map((favId) => {
-    const meta = favoriteMeta.get(favId);
-    const sbgMatch = sbgSongs.find((s) => s.id === favId);
+  const favoriteItems: UserPlaylistItem[] = Array.from(favorites).map((fav: any) => {
+    const favId = typeof fav === 'string' ? fav : fav.id;
+    const meta = favoriteMeta && typeof favoriteMeta.get === 'function' ? favoriteMeta.get(favId) : ((favoriteMeta as any)?.[favId] || null);
+    const sbgMatch = sbgSongs.find((s) => s.id === favId) || (typeof fav === 'object' ? fav : undefined);
 
     const title = meta?.title || sbgMatch?.title || 'Unknown Track';
     const artist = meta?.artist || sbgMatch?.artist || 'Unknown Artist';
     const coverUrl = meta?.coverUrl || meta?.thumbnailUrl || sbgMatch?.coverUrl || sbgMatch?.thumbnailUrl || '';
-    const isYt = favId.startsWith('yt_') || Boolean(meta?.youtubeVideoId);
-    const ytId = meta?.youtubeVideoId || (favId.startsWith('yt_') ? favId.replace('yt_', '') : undefined);
+    const isYt = String(favId).startsWith('yt_') || Boolean(meta?.youtubeVideoId);
+    const ytId = meta?.youtubeVideoId || (String(favId).startsWith('yt_') ? String(favId).replace('yt_', '') : undefined);
 
     return {
-      id: isYt && ytId ? `yt_${ytId}` : favId,
-      songId: !isYt ? favId : undefined,
+      id: isYt && ytId ? `yt_${ytId}` : String(favId),
+      songId: !isYt ? String(favId) : undefined,
       youtubeVideoId: ytId,
       title,
       artist,
@@ -153,7 +154,7 @@ export default function AddMoreSongsModal({
       audioUrl: meta?.audioUrl || sbgMatch?.audioUrl || (ytId ? `https://www.youtube.com/watch?v=${ytId}` : ''),
       duration: meta?.duration || sbgMatch?.duration || 0,
       source: isYt ? 'youtube' : 'sbg',
-      addedAt: new Date().toISOString(),
+      addedAt: Date.now(),
     };
   });
 
@@ -339,7 +340,7 @@ export default function AddMoreSongsModal({
                   audioUrl: s.audioUrl || s.youtubeUrl || '',
                   duration: s.duration || 0,
                   source: 'sbg',
-                  addedAt: new Date().toISOString(),
+                  addedAt: Date.now(),
                 };
 
                 return (
@@ -406,7 +407,7 @@ export default function AddMoreSongsModal({
                 audioUrl: `https://www.youtube.com/watch?v=${videoId}`,
                 duration: yt.duration || 0,
                 source: 'youtube',
-                addedAt: new Date().toISOString(),
+                addedAt: Date.now(),
               };
 
               return (

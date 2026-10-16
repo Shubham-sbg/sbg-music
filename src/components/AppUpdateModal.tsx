@@ -15,22 +15,26 @@ import {
 import { AppVersionInfo, CURRENT_APP_VERSION } from '../services/versionCheckService';
 import { useNavigate } from 'react-router-dom';
 
+import { useVersionCheck } from '../hooks/useVersionCheck';
+
 interface AppUpdateModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  updateInfo: AppVersionInfo | null;
+  isOpen?: boolean;
+  onClose?: () => void;
+  updateInfo?: AppVersionInfo | null;
 }
 
-export default function AppUpdateModal({
-  isOpen,
-  onClose,
-  updateInfo,
-}: AppUpdateModalProps) {
+export default function AppUpdateModal(props: AppUpdateModalProps = {}) {
+  const versionHook = useVersionCheck();
+  const isOpen = props.isOpen !== undefined ? props.isOpen : versionHook.isModalOpen;
+  const onClose = props.onClose || versionHook.closeModal;
+  const updateInfo = props.updateInfo !== undefined ? props.updateInfo : versionHook.updateInfo;
+
   const navigate = useNavigate();
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
 
   if (!isOpen || !updateInfo) return null;
+
 
   const targetVersion = updateInfo.versionName || '2.4.0';
   const downloadUrl = updateInfo.downloadUrl || '/downloads/sbg-music.apk';

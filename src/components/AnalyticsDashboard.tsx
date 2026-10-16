@@ -376,7 +376,7 @@ export default function AnalyticsDashboard() {
   const timeSeriesData = useMemo(() => {
     if (filteredDailyList.length > 0) {
       return filteredDailyList.map((d) => ({
-        date: d.date.slice(5),
+        date: (d.date || '').slice(5),
         plays: listenerFilter === 'authenticated' ? (d.authenticatedPlays || 0) : listenerFilter === 'anonymous' ? (d.anonymousPlays || 0) : (d.totalPlays || 0),
         watchMinutes: Math.round(
           (listenerFilter === 'authenticated' ? (d.authenticatedListenSeconds || 0) : listenerFilter === 'anonymous' ? (d.anonymousListenSeconds || 0) : (d.totalListenSeconds || 0)) / 60

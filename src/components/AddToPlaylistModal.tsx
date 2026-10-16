@@ -102,7 +102,7 @@ export default function AddToPlaylistModal({
     audioUrl: songItem.audioUrl || (songItem.youtubeVideoId ? `https://www.youtube.com/watch?v=${songItem.youtubeVideoId}` : ''),
     duration: songItem.duration || 0,
     source: songItem.source === 'youtube' || songItem.youtubeVideoId ? 'youtube' : 'sbg',
-    addedAt: new Date().toISOString(),
+    addedAt: Date.now(),
   };
 
   const handleAddToSelectedPlaylist = async (targetPlaylistId?: string) => {

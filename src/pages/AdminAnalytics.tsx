@@ -166,7 +166,7 @@ export default function AdminAnalytics() {
     } else if (timeRange === '90d') {
       filtered = filtered.slice(-90);
     } else if (timeRange === 'custom' && startDate && endDate) {
-      filtered = filtered.filter(d => d.date >= startDate && d.date <= endDate);
+      filtered = filtered.filter(d => Boolean(d.date && d.date >= startDate && d.date <= endDate));
     }
 
     return filtered;
@@ -309,7 +309,7 @@ export default function AdminAnalytics() {
     filteredDailyData.forEach((d) => {
       if (d.sourceBreakdown) {
         Object.entries(d.sourceBreakdown).forEach(([k, v]) => {
-          counts[k] = (counts[k] || 0) + (v || 0);
+          counts[k] = (counts[k] || 0) + (Number(v) || 0);
         });
       }
     });

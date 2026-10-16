@@ -164,7 +164,7 @@ export default function UserPlaylistDetail() {
   };
 
   const songs = items.map(convertItemToSong);
-  const isPlaylistActive = Boolean(id && activePlaylistId === id) || songs.some((s) => s.id === currentSong?.id);
+  const isPlaylistActive = Boolean(id && activePlaylistId === id) || songs.some((s: Song) => s.id === currentSong?.id);
   const isPlaylistLoading = isPlaylistActive && (isLoading || isBuffering);
 
   const handlePlayAll = () => {
@@ -184,7 +184,7 @@ export default function UserPlaylistDetail() {
 
   const handleAddAllToQueue = () => {
     if (songs.length === 0) return;
-    songs.forEach((s) => addToQueue(s));
+    songs.forEach((s: Song) => addToQueue(s));
   };
 
   const handleToggleVisibility = async () => {
@@ -195,7 +195,7 @@ export default function UserPlaylistDetail() {
         visibility: newVisibility,
         updatedAt: serverTimestamp(),
       });
-      setPlaylist((prev) => prev ? { ...prev, visibility: newVisibility } : null);
+      setPlaylist((prev: any) => prev ? { ...prev, visibility: newVisibility } : null);
     } catch (err) {
       console.error('Failed to update visibility:', err);
     }
@@ -212,7 +212,7 @@ export default function UserPlaylistDetail() {
         description: editDescription.trim(),
         updatedAt: serverTimestamp(),
       });
-      setPlaylist((prev) =>
+      setPlaylist((prev: any) =>
         prev ? { ...prev, name: editName.trim(), description: editDescription.trim() } : null
       );
       setIsEditing(false);
@@ -248,7 +248,7 @@ export default function UserPlaylistDetail() {
         coverUrl: newCover,
         updatedAt: serverTimestamp(),
       });
-      setPlaylist((prev) =>
+      setPlaylist((prev: any) =>
         prev
           ? {
               ...prev,
@@ -278,7 +278,7 @@ export default function UserPlaylistDetail() {
         items: updatedItems,
         updatedAt: serverTimestamp(),
       });
-      setPlaylist((prev) => (prev ? { ...prev, items: updatedItems } : null));
+      setPlaylist((prev: any) => (prev ? { ...prev, items: updatedItems } : null));
     } catch (err) {
       console.error('Failed to move song:', err);
     }
@@ -567,7 +567,7 @@ export default function UserPlaylistDetail() {
         </div>
 
         <div className="space-y-2">
-          {items.map((item, index) => {
+          {items.map((item: any, index: number) => {
             const song = songs[index];
             const isCurrentPlaying = currentSong?.id === song.id;
             const isCurrentLoading = isCurrentPlaying && (isLoading || isBuffering);
@@ -725,7 +725,7 @@ export default function UserPlaylistDetail() {
           playlist={playlist}
           onClose={() => setShowShareModal(false)}
           onVisibilityChange={(newVisibility) => {
-            setPlaylist((prev) => prev ? { ...prev, visibility: newVisibility } : null);
+            setPlaylist((prev: any) => prev ? { ...prev, visibility: newVisibility } : null);
           }}
         />
       )}

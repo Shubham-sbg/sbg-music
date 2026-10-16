@@ -80,7 +80,6 @@ function saveOfflineSongs(songs: OfflineSongItem[]): void {
  * Checks if a specific song is downloaded and available offline.
  */
 export function isSongCachedOffline(songId: string): boolean {
-  if (isSongDownloaded(songId)) return true;
   const songs = getSavedOfflineSongs();
   return songs.some((s) => s.id === songId && s.isFullyCached);
 }

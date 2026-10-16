@@ -16,7 +16,7 @@ interface AddToLibraryButtonProps {
     coverUrl?: string;
     audioUrl?: string;
     duration?: number;
-    source?: 'youtube' | 'sbg' | 'upload';
+    source?: 'youtube' | 'sbg' | 'upload' | 'catalog' | string;
   };
   compact?: boolean;
   className?: string;

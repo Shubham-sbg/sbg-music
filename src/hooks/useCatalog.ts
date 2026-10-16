@@ -105,7 +105,7 @@ export function usePaginatedSongs(pageSize = 24) {
   const cachedInitial = getCachedData<Song[]>('all_firestore_songs') || ssrInitial;
   const [songs, setSongs] = useState<Song[]>(() => {
     if (cachedInitial && cachedInitial.length > 0) {
-      return cachedInitial.filter((s) => s.published !== false);
+      return cachedInitial.filter((s: Song) => s.published !== false);
     }
     return [];
   });
@@ -330,7 +330,7 @@ export function usePlaylistDetail(playlistId: string | undefined) {
 
       // Preserve exact order from playlist.songIds
       const orderedSongs = songIds
-        .map((id) => fetchedSongs.find((s) => s.id === id))
+        .map((id: string) => fetchedSongs.find((s: Song) => s.id === id))
         .filter(Boolean) as Song[];
 
       setSongs(orderedSongs);

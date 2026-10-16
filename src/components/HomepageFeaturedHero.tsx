@@ -180,8 +180,8 @@ export default function HomepageFeaturedHero({
   const displayLinks: FeaturedCtaLink[] = (() => {
     if (activeFeatured.externalLinks && activeFeatured.externalLinks.length > 0) {
       const active = activeFeatured.externalLinks
-        .filter((l) => l.enabled !== false && l.url && l.url.trim())
-        .sort((a, b) => (a.order || 0) - (b.order || 0));
+        .filter((l: any) => l.enabled !== false && l.url && l.url.trim())
+        .sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
       if (active.length > 0) return active;
     }
     return DEFAULT_BRAND_LINKS;

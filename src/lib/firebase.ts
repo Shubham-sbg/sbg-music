@@ -6,6 +6,7 @@ import {
   persistentMultipleTabManager 
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { getStorage } from 'firebase/storage';
 
 // Standard environment or fallback credentials
 const firebaseConfig = {
@@ -34,4 +35,5 @@ try {
 
 export const db = dbInstance;
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 export default app;

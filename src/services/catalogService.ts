@@ -25,7 +25,7 @@ export interface CatalogSongInput {
   durationSeconds?: number;
   genre?: string;
   album?: string;
-  source?: 'youtube' | 'sbg' | 'upload';
+  source?: 'youtube' | 'sbg' | 'upload' | 'catalog' | string;
 }
 
 /**

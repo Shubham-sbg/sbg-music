@@ -69,6 +69,13 @@ export function sanitizeAndValidateUrl(url: string): { isValid: boolean; normali
   }
 }
 
+interface ModalLinkItem {
+  id: string;
+  label: string;
+  url: string;
+  enabled: boolean;
+}
+
 export default function EditFeaturedModal({ song, isOpen, onClose, onSaved }: EditFeaturedModalProps) {
   if (!isOpen || !song) return null;
 
@@ -102,9 +109,14 @@ export default function EditFeaturedModal({ song, isOpen, onClose, onSaved }: Ed
   const [externalLinkUrl, setExternalLinkUrl] = useState(song.externalUrl || song.externalLinkUrl || '');
   
   // Multiple links support
-  const [externalLinks, setExternalLinks] = useState<ExternalLinkItem[]>(() => {
+  const [externalLinks, setExternalLinks] = useState<ModalLinkItem[]>(() => {
     if (song.externalLinks && song.externalLinks.length > 0) {
-      return song.externalLinks;
+      return (song.externalLinks as any[]).map((l: any, idx: number) => ({
+        id: l.id || String(idx + 1),
+        label: l.label || l.title || 'Official Website',
+        url: l.url || '',
+        enabled: l.enabled ?? true,
+      }));
     }
     const initialUrl = song.externalUrl || song.externalLinkUrl || '';
     if (initialUrl) {
@@ -161,7 +173,14 @@ export default function EditFeaturedModal({ song, isOpen, onClose, onSaved }: Ed
       setExternalLinkUrl(initialExtUrl);
 
       if (song.externalLinks && song.externalLinks.length > 0) {
-        setExternalLinks(song.externalLinks);
+        setExternalLinks(
+          (song.externalLinks as any[]).map((l: any, idx: number) => ({
+            id: l.id || String(idx + 1),
+            label: l.label || l.title || 'Official Website',
+            url: l.url || '',
+            enabled: l.enabled ?? true,
+          }))
+        );
       } else if (initialExtUrl) {
         setExternalLinks([
           {
@@ -220,7 +239,7 @@ export default function EditFeaturedModal({ song, isOpen, onClose, onSaved }: Ed
   };
 
   // Update specific external link field
-  const handleUpdateLink = (id: string, field: keyof ExternalLinkItem, value: any) => {
+  const handleUpdateLink = (id: string, field: keyof ModalLinkItem, value: any) => {
     setExternalLinks((prev) =>
       prev.map((link) => (link.id === id ? { ...link, [field]: value } : link))
     );

@@ -89,7 +89,7 @@ export async function addToUserLibrary(
     audioUrl?: string;
     duration?: number;
     genre?: string;
-    source?: 'youtube' | 'sbg' | 'upload';
+    source?: 'youtube' | 'sbg' | 'upload' | 'catalog' | string;
   }
 ): Promise<{ success: boolean; alreadyExists: boolean; item?: UserLibraryItem; error?: string }> {
   if (!userId) {

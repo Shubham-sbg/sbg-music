@@ -36,14 +36,17 @@ export default function FavoriteSongsSection() {
         const result: Song[] = [];
         const seenIds = new Set<string>();
 
-        for (const favId of Array.from(favorites)) {
-          if (seenIds.has(favId)) continue;
+        for (const fav of Array.from(favorites)) {
+          const favId = typeof fav === 'string' ? fav : (fav as any).id;
+          if (!favId || seenIds.has(favId)) continue;
           seenIds.add(favId);
 
           if (catalogMap.has(favId)) {
             result.push(catalogMap.get(favId)!);
+          } else if (typeof fav === 'object' && fav.title) {
+            result.push(fav as Song);
           } else {
-            const meta = favoriteMeta.get(favId);
+            const meta = favoriteMeta && typeof favoriteMeta.get === 'function' ? favoriteMeta.get(favId) : (favoriteMeta ? favoriteMeta[favId] : null);
             const isYt = favId.startsWith('yt_') || meta?.source === 'youtube' || Boolean(meta?.youtubeVideoId);
             const ytId = meta?.youtubeVideoId || (favId.startsWith('yt_') ? favId.replace('yt_', '') : undefined);
             const ytThumb = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : '';
