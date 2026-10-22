@@ -367,7 +367,7 @@ export default function AdminStaff() {
                   <Edit3 size={16} />
                 </button>
                 <button
-                  onClick={() => handleDeleteStaff(staff.id!, staff.displayName)}
+                  onClick={() => handleDeleteStaff(staff.id!, staff.displayName || 'Staff Member')}
                   className="p-2 text-red-400/80 hover:text-red-300 hover:bg-red-400/10 rounded-xl transition-colors border border-red-500/20"
                   title="Delete Staff Member"
                 >

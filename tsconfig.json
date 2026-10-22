@@ -21,16 +21,6 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": [
-    "src/main.tsx",
-    "src/App.tsx",
-    "src/types.ts",
-    "src/vite-env.d.ts",
-    "src/components/AudioVisualizer.tsx",
-    "src/components/QueueDrawer.tsx",
-    "src/components/StickyAudioPlayer.tsx",
-    "src/components/TrackList.tsx",
-    "src/data/mockTracks.ts",
-    "src/utils/audioEngine.ts",
-    "src/utils/formatTime.ts"
+    "src"
   ]
 }

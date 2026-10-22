@@ -277,13 +277,34 @@ export function usePlaylistDetail(playlistId: string | undefined) {
 
     setLoading(true);
     try {
-      // 1. Fetch Playlist Document
+      // 1. Fetch Playlist Document from Firestore, fallback, or localStorage
       const plData = await dedupeRequest(
         `playlist_detail_${playlistId}`,
         async () => {
-          const snap = await getDoc(doc(db, 'playlists', playlistId));
-          if (!snap.exists()) return null;
-          return { id: snap.id, ...snap.data() } as Playlist;
+          // Check server API or direct Firestore first
+          try {
+            const snap = await getDoc(doc(db, 'playlists', playlistId));
+            if (snap.exists()) {
+              return { id: snap.id, ...snap.data() } as Playlist;
+            }
+          } catch (e) {
+            console.warn('[usePlaylistDetail] Firestore fetch error:', e);
+          }
+
+          // Check FALLBACK_PLAYLISTS
+          const fb = FALLBACK_PLAYLISTS.find((p) => p.id === playlistId);
+          if (fb) return fb;
+
+          // Check localStorage for custom playlists
+          if (typeof window !== 'undefined') {
+            try {
+              const custom = JSON.parse(localStorage.getItem('sbg_user_custom_playlists') || '[]');
+              const matched = custom.find((p: any) => p.id === playlistId);
+              if (matched) return matched;
+            } catch {}
+          }
+
+          return null;
         },
         DEFAULT_TTL
       );
@@ -297,7 +318,14 @@ export function usePlaylistDetail(playlistId: string | undefined) {
 
       setPlaylist(plData);
 
-      // 2. Fetch Playlist Songs in chunks of 10
+      // If songs are directly embedded on playlist object
+      if (plData.songs && plData.songs.length > 0) {
+        setSongs(plData.songs);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Fetch Playlist Songs by resolving songIds against the full catalog
       const songIds = plData.songIds || [];
       if (songIds.length === 0) {
         setSongs([]);
@@ -305,6 +333,22 @@ export function usePlaylistDetail(playlistId: string | undefined) {
         return;
       }
 
+      try {
+        const allSongs = await fetchAllFirestoreSongs(forceRefresh);
+        const songMap = new Map(allSongs.map((s) => [s.id, s]));
+        const orderedSongs = songIds.map((id: string) => songMap.get(id)).filter(Boolean) as Song[];
+
+        if (orderedSongs.length > 0) {
+          setSongs(orderedSongs);
+          setErrorMsg(null);
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('[usePlaylistDetail] Fast song resolution notice:', err);
+      }
+
+      // Fallback: chunked query
       const chunks: string[][] = [];
       for (let i = 0; i < songIds.length; i += 10) {
         chunks.push(songIds.slice(i, i + 10));
@@ -328,7 +372,6 @@ export function usePlaylistDetail(playlistId: string | undefined) {
       const results = await Promise.all(chunkPromises);
       const fetchedSongs = results.flat();
 
-      // Preserve exact order from playlist.songIds
       const orderedSongs = songIds
         .map((id: string) => fetchedSongs.find((s: Song) => s.id === id))
         .filter(Boolean) as Song[];

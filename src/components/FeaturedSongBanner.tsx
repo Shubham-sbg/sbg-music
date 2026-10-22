@@ -73,7 +73,7 @@ export default function FeaturedSongBanner({
 
   // Filter active valid external CTAs
   const activeLinks = externalLinks
-    .filter((l) => l.enabled !== false && l.url && l.url.trim())
+    .filter((l): l is FeaturedCtaLink & { url: string } => Boolean(l.enabled !== false && l.url && l.url.trim()))
     .map((l) => ({ ...l, validated: sanitizeAndValidateUrl(l.url) }))
     .filter((l) => l.validated.isValid);
 
@@ -210,13 +210,13 @@ export default function FeaturedSongBanner({
             <div className="flex items-center gap-2.5 overflow-x-auto pb-1 max-w-full scrollbar-none pt-1 sm:pt-0">
               {activeLinks.map((link) => (
                 <button
-                  key={link.id}
-                  onClick={() => handleCtaClick(link.id, link.url)}
-                  aria-label={`Visit ${link.label}`}
+                  key={link.id || link.url}
+                  onClick={() => handleCtaClick(link.id || '', link.url)}
+                  aria-label={`Visit ${link.label || 'Link'}`}
                   className="bg-black/60 hover:bg-black/90 text-white border border-white/20 hover:border-white/40 px-5 py-3.5 rounded-full font-bold text-xs sm:text-sm flex items-center gap-2 backdrop-blur-md shadow-lg hover:scale-105 active:scale-95 transition-all whitespace-nowrap shrink-0 cursor-pointer min-h-[44px]"
                 >
-                  {getCtaIcon(link.label, link.url)}
-                  <span>{link.label}</span>
+                  {getCtaIcon(link.label || '', link.url)}
+                  <span>{link.label || 'Visit'}</span>
                   <ExternalLink size={13} className="text-white/50 shrink-0" />
                 </button>
               ))}

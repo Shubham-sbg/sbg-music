@@ -447,7 +447,7 @@ export default function AdminPlaylists({ onSwitchToImport }: { onSwitchToImport?
           <div className="bg-black/40 p-4 rounded-2xl border border-white/5 space-y-1">
             <span className="text-[10px] font-mono text-white/40 uppercase">Last Synced</span>
             <p className="text-xs text-white/70 font-mono">
-              {activePlaylist.updatedAt?.toDate ? activePlaylist.updatedAt.toDate().toLocaleString() : 'Just now'}
+              {(activePlaylist.updatedAt as any)?.toDate ? (activePlaylist.updatedAt as any).toDate().toLocaleString() : 'Just now'}
             </p>
           </div>
         </div>
@@ -888,7 +888,7 @@ export default function AdminPlaylists({ onSwitchToImport }: { onSwitchToImport?
               <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs">
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => togglePublishStatus(pl.id, pl.published)}
+                    onClick={() => togglePublishStatus(pl.id, Boolean(pl.published))}
                     className={`px-2.5 py-1 rounded-full border text-[11px] font-bold flex items-center gap-1.5 transition-colors ${
                       pl.published
                         ? 'border-green-500/30 text-green-400 bg-green-500/10'

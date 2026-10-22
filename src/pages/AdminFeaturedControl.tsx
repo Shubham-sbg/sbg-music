@@ -741,7 +741,7 @@ export default function AdminFeaturedControl() {
                       <span>Activate</span>
                     </button>
                     <button
-                      onClick={() => handleDeleteHistory(hist.id)}
+                      onClick={() => hist.id && handleDeleteHistory(hist.id)}
                       disabled={actionLoading || !canManage}
                       className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
                       title="Delete permanently"

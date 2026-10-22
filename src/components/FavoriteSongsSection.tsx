@@ -46,7 +46,7 @@ export default function FavoriteSongsSection() {
           } else if (typeof fav === 'object' && fav.title) {
             result.push(fav as Song);
           } else {
-            const meta = favoriteMeta && typeof favoriteMeta.get === 'function' ? favoriteMeta.get(favId) : (favoriteMeta ? favoriteMeta[favId] : null);
+            const meta = favoriteMeta instanceof Map ? favoriteMeta.get(favId) : (favoriteMeta ? (favoriteMeta as any)[favId] : null);
             const isYt = favId.startsWith('yt_') || meta?.source === 'youtube' || Boolean(meta?.youtubeVideoId);
             const ytId = meta?.youtubeVideoId || (favId.startsWith('yt_') ? favId.replace('yt_', '') : undefined);
             const ytThumb = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : '';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Loader2, AlertCircle, X, Gauge, Minimize2, Maximize2, Moon, Activity, Mic2, MoreVertical, Sliders, Share2, Repeat, Repeat1, Shuffle, BookmarkPlus, ListPlus, ArrowUpDown, RefreshCw } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Loader2, AlertCircle, X, Gauge, Minimize2, Maximize2, Moon, Activity, Mic2, MoreVertical, Sliders, Share2, Repeat, Repeat1, Shuffle, BookmarkPlus, ListPlus, ArrowUpDown, RefreshCw, Zap, HardDrive, Wifi, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDrag } from '@use-gesture/react';
 import { usePlayer } from '../context/PlayerContext';
@@ -250,6 +250,11 @@ export default function Player() {
     repeatMode,
     toggleRepeatMode,
     shuffleQueue,
+    networkStatus,
+    networkStatusText,
+    currentSourceBadge,
+    dataSaverSettings,
+    openDataSaverModal,
   } = usePlayer();
 
   const [autoMinimizeOnScroll, setAutoMinimizeOnScroll] = useState<boolean>(() => {
@@ -325,9 +330,7 @@ export default function Player() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [autoMinimizeOnScroll, isMiniPlayer, setIsMiniPlayer]);
 
-  const effectiveDuration = (duration && duration > 0)
-    ? duration
-    : (currentSong?.durationSeconds || currentSong?.duration || 0);
+  const effectiveDuration = currentSong?.durationSeconds || currentSong?.duration || duration || 0;
 
   const formatTime = (time: number) => {
     if (isNaN(time) || time < 0) return '0:00';
@@ -377,7 +380,7 @@ export default function Player() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => clickAd(activeBannerAd.id, activeBannerAd.destinationUrl || '')}
+              onClick={() => clickAd(activeBannerAd.id || '', activeBannerAd.destinationUrl || '')}
               className="px-3 py-1.5 bg-white text-black font-bold text-xs rounded-xl hover:scale-105 transition-transform"
             >
               {activeBannerAd.buttonLabel || 'Learn More'}
@@ -567,11 +570,28 @@ export default function Player() {
                     onClick={() => setIsMiniPlayer(false)}
                     title="Click to expand to full player"
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {isVoiceAdPlaying && (
                         <span className="px-1 py-0.2 bg-purple-500/20 text-purple-300 text-[8px] font-bold uppercase rounded">Ad</span>
                       )}
-                      <div className="font-bold text-xs sm:text-sm truncate text-white hover:text-purple-300 transition-colors">
+                      {currentSourceBadge === 'Downloaded / Offline' && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[8px] font-bold tracking-wider uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          <HardDrive size={8} />
+                          <span>Downloaded</span>
+                        </span>
+                      )}
+                      {(isBuffering || isLoading) && (
+                        <span className="inline-flex items-center gap-1 text-purple-400">
+                          <Loader2 size={10} className="animate-spin" />
+                        </span>
+                      )}
+                      {(networkStatus === 'offline' || networkStatus === 'slow_connection') && networkStatusText && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[8px] font-bold bg-red-950/60 border border-red-500/30 text-red-300">
+                          {networkStatus === 'slow_connection' ? <Wifi size={8} className="text-amber-400" /> : <WifiOff size={8} className="text-red-400" />}
+                          <span>{networkStatusText}</span>
+                        </span>
+                      )}
+                      <div className="font-bold text-xs sm:text-sm truncate text-white hover:text-purple-300 transition-colors w-full">
                         {displayTitle}
                       </div>
                     </div>
@@ -698,6 +718,23 @@ export default function Player() {
                   )}
                 </div>
                 <div className="min-w-0 flex-1" onClick={() => setIsMiniPlayer(true)}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    {currentSourceBadge === 'Downloaded / Offline' && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[8px] font-bold tracking-wider uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        <HardDrive size={8} />
+                        <span>Downloaded</span>
+                      </span>
+                    )}
+                    {(isBuffering || isLoading) && (
+                      <Loader2 size={10} className="animate-spin text-purple-400 shrink-0" />
+                    )}
+                    {(networkStatus === 'offline' || networkStatus === 'slow_connection') && networkStatusText && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[8px] font-bold bg-red-950/60 border border-red-500/30 text-red-300 truncate max-w-[140px]">
+                        {networkStatus === 'slow_connection' ? <Wifi size={8} className="text-amber-400 shrink-0" /> : <WifiOff size={8} className="text-red-400 shrink-0" />}
+                        <span className="truncate">{networkStatusText}</span>
+                      </span>
+                    )}
+                  </div>
                   <div className="font-bold text-xs text-white truncate">{displayTitle}</div>
                   <div className="text-[11px] text-white/50 truncate">{displayArtist}</div>
                 </div>
@@ -873,6 +910,7 @@ export default function Player() {
                       <span>Volume Normalization (LUFS): {volumeNormalizationEnabled ? 'On' : 'Off'}</span>
                     </button>
 
+
                     <button
                       onClick={() => { setShowShareModal(true); setShowMobileMenu(false); }}
                       className="flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium border transition-colors col-span-2 bg-white/5 text-white/80 border-white/10 hover:bg-white/10"
@@ -975,13 +1013,32 @@ export default function Player() {
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-0.5">
+                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                   {isVoiceAdPlaying && (
                     <span className="px-1.5 py-0.2 bg-purple-500/20 text-purple-300 text-[9px] font-bold uppercase rounded shrink-0">Ad</span>
                   )}
-                  <div className="font-bold text-sm text-white truncate w-full" title={displayTitle || ''}>
-                    {displayTitle}
-                  </div>
+                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase shrink-0 ${
+                    currentSourceBadge === 'Downloaded / Offline'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                  }`}>
+                    {currentSourceBadge === 'Downloaded / Offline' && <HardDrive size={9} />}
+                    {currentSourceBadge === 'Online streaming' && <Wifi size={9} />}
+                    {currentSourceBadge}
+                  </span>
+                  {networkStatusText && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-900/40 border border-purple-500/30 text-purple-300 animate-pulse shrink-0">
+                      {(isBuffering || isLoading || networkStatus === 'connecting' || networkStatus === 'reconnecting' || networkStatus === 'loading') && (
+                        <Loader2 size={9} className="animate-spin text-purple-400 shrink-0" />
+                      )}
+                      {networkStatus === 'slow_connection' && <Wifi size={9} className="text-amber-400 shrink-0" />}
+                      {networkStatus === 'offline' && <WifiOff size={9} className="text-red-400 shrink-0" />}
+                      <span>{networkStatusText}</span>
+                    </span>
+                  )}
+                </div>
+                <div className="font-bold text-sm text-white truncate w-full" title={displayTitle || ''}>
+                  {displayTitle}
                 </div>
                 <div className="text-xs text-white/50 truncate flex items-center gap-2 w-full">
                   <span className="truncate" title={displayArtist || ''}>{displayArtist}</span>
@@ -1236,6 +1293,7 @@ export default function Player() {
                 <Share2 size={14} className="text-purple-400" />
                 <span className="hidden xl:inline text-xs font-medium">Share</span>
               </button>
+
 
               {/* Lyrics Button */}
               <button

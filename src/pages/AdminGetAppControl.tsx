@@ -303,7 +303,7 @@ export default function AdminGetAppControl() {
               </h2>
 
               <p className="text-xs text-white/60">
-                Package: <span className="font-mono text-white/80">{defaultRelease.fileName}</span> • Size: <span className="font-mono text-emerald-400">{defaultRelease.fileSizeFormatted}</span> • Released: {new Date(defaultRelease.createdAt).toLocaleDateString()}
+                Package: <span className="font-mono text-white/80">{defaultRelease.fileName}</span> • Size: <span className="font-mono text-emerald-400">{defaultRelease.fileSizeFormatted}</span> • Released: {defaultRelease.createdAt ? new Date(defaultRelease.createdAt).toLocaleDateString() : 'N/A'}
               </p>
 
               {defaultRelease.storagePath && (
@@ -392,7 +392,7 @@ export default function AdminGetAppControl() {
                       <span>Size: {rel.fileSizeFormatted}</span>
                       <span>Target: {rel.targetAndroidVersion}</span>
                       <span>Min: {rel.minAndroidVersion}</span>
-                      <span>Created: {new Date(rel.createdAt).toLocaleDateString()}</span>
+                      <span>Created: {rel.createdAt ? new Date(rel.createdAt).toLocaleDateString() : 'N/A'}</span>
                     </div>
 
                     {rel.sha256 && (

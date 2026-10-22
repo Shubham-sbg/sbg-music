@@ -14,7 +14,7 @@ export const FALLBACK_SONGS: Song[] = [
     isFeatured: true,
     isPopular: true,
     coverUrl: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80',
-    audioUrl: 'https://cdn.freesound.org/previews/612/612088_5674468-lq.mp3',
+    audioUrl: '/audio/sbg_anthem.wav',
     source: 'catalog',
     lyrics: `[00:10.00] Driving through the neon rain
 [00:25.00] Speeding lights across the brain
@@ -36,7 +36,7 @@ export const FALLBACK_SONGS: Song[] = [
     isFeatured: true,
     isPopular: true,
     coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=600&q=80',
-    audioUrl: 'https://cdn.freesound.org/previews/648/648425_11861866-lq.mp3',
+    audioUrl: '/audio/lofi_rhodes.wav',
     source: 'catalog',
     lyrics: `[00:05.00] Soft rain outside the window pane
 [00:20.00] Quiet echoes ease the pain
@@ -56,7 +56,7 @@ export const FALLBACK_SONGS: Song[] = [
     isFeatured: true,
     isPopular: true,
     coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80',
-    audioUrl: 'https://cdn.freesound.org/previews/573/573381_11861866-lq.mp3',
+    audioUrl: '/audio/trap_808.wav',
     source: 'catalog',
     lyrics: `[00:12.00] Dholak rhythm with the heavy bass
 [00:28.00] Pumping energy through time and space
@@ -74,7 +74,7 @@ export const FALLBACK_SONGS: Song[] = [
     plays: 98400,
     likes: 6730,
     coverUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=600&q=80',
-    audioUrl: 'https://cdn.freesound.org/previews/568/568868_2538031-lq.mp3',
+    audioUrl: '/audio/ambient_meditation.wav',
     source: 'catalog',
   },
   {
@@ -90,7 +90,7 @@ export const FALLBACK_SONGS: Song[] = [
     isFeatured: true,
     isPopular: true,
     coverUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80',
-    audioUrl: 'https://cdn.freesound.org/previews/476/476903_2174833-lq.mp3',
+    audioUrl: '/audio/cyberpunk_synth.wav',
     source: 'catalog',
   },
   {
@@ -104,7 +104,7 @@ export const FALLBACK_SONGS: Song[] = [
     plays: 178000,
     likes: 12400,
     coverUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=600&q=80',
-    audioUrl: 'https://cdn.freesound.org/previews/540/540854_11861866-lq.mp3',
+    audioUrl: '/audio/cinematic_swell.wav',
     source: 'catalog',
   }
 ];

@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-export * from '../../node_modules/lucide-react/dist/esm/lucide-react.mjs';
+export * from 'lucide-react';
 
 const createBrandIcon = (children: React.ReactNode, viewBox = '0 0 24 24') => {
   const Icon = forwardRef<SVGSVGElement, any>(

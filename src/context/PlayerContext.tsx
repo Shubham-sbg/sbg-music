@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useRef, ReactNode, useEffect, useCallback } from 'react';
 import { Song, AdCampaign } from '../types';
-import { extractYoutubeVideoId } from '../lib/youtube';
 import { flushPlaybackAnalytics } from '../lib/analytics';
 import { recordPlaybackStart, recordPlaybackPause, recordPlaybackComplete, flushPlaybackEventsBuffer } from '../services/analyticsService';
 import { db } from '../lib/firebase';
@@ -20,11 +19,27 @@ import {
   recordVoiceAdCompletion 
 } from '../lib/ads';
 import { autoCacheActiveTrack } from '../services/offlineMusicService';
-import { getOfflineSongBlobUrl } from '../services/offlineStorageService';
-import { Minimize2, Maximize2, X, Radio, AlertCircle, RefreshCw } from 'lucide-react';
+import { getOfflineSongBlobUrl, resolveOfflineSongBlobUrl, isSongDownloaded } from '../services/offlineStorageService';
+import { getDataSaverSettings, subscribeToDataSaver, DataSaverSettings } from '../services/dataSaverService';
+import DataSaverModal from '../components/DataSaverModal';
+import ReactPlayer from 'react-player';
+import { extractYoutubeVideoId } from '../lib/youtube';
+import { FALLBACK_SONGS } from '../data/fallbackCatalog';
 
-export type PlaybackLifecycleState = 'idle' | 'loading' | 'buffering' | 'playing' | 'paused' | 'ended' | 'error';
+const PlayerComponent: any = (ReactPlayer as any).default || ReactPlayer;
+
+export type PlaybackLifecycleState = 'idle' | 'loading' | 'buffering' | 'playing' | 'paused' | 'ended' | 'error' | 'offline';
 export type TrackSourceType = 'direct' | 'youtube';
+export type NetworkPlaybackStatus = 
+  | 'idle' 
+  | 'connecting' 
+  | 'loading' 
+  | 'buffering' 
+  | 'slow_connection' 
+  | 'reconnecting' 
+  | 'offline' 
+  | 'error';
+export type PlaybackSourceBadge = 'Downloaded / Offline' | 'Online streaming';
 
 export interface PlaybackDiagnosticInfo {
   diagnosticId: string;
@@ -62,10 +77,10 @@ export interface PlayerContextType {
   activeBannerAd: AdCampaign | null;
   activeVoiceAd: AdCampaign | null;
   isVoiceAdPlaying: boolean;
-  isYoutubeDockVisible: boolean;
-  isYoutubeDockMinimized: boolean;
-  toggleYoutubeDock: () => void;
-  toggleYoutubeDockMinimized: () => void;
+  isYoutubeDockVisible?: boolean;
+  isYoutubeDockMinimized?: boolean;
+  toggleYoutubeDock?: () => void;
+  toggleYoutubeDockMinimized?: () => void;
   retryPlayback: () => void;
   playSong: (song: Song, newQueue?: Song[], playlistId?: string, resumeTime?: number, explicitSource?: string) => void;
   resumeSong: (song: Song, newQueue?: Song[], playlistId?: string) => void;
@@ -113,8 +128,14 @@ export interface PlayerContextType {
   shareToast: string | null;
   repeatMode: 'off' | 'all' | 'one';
   toggleRepeatMode: () => void;
-  audioMode: string;
-  setAudioMode: (mode: string) => void;
+  networkStatus: NetworkPlaybackStatus;
+  networkStatusText: string | null;
+  currentSourceBadge: PlaybackSourceBadge;
+  dataSaverSettings: DataSaverSettings;
+  isDataSaverModalOpen: boolean;
+  openDataSaverModal: () => void;
+  closeDataSaverModal: () => void;
+  toggleDataSaver: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -124,18 +145,20 @@ const PlayerContext = createContext<PlayerContextType | null>(null);
  */
 export function getTrackSourceType(song: Song | null): TrackSourceType {
   if (!song) return 'direct';
-  const offlineBlob = getOfflineSongBlobUrl(song.id);
-  if (offlineBlob) return 'direct';
-  if (song.source === 'youtube') return 'youtube';
-  if (song.youtubeVideoId && /^[a-zA-Z0-9_-]{11}$/.test(song.youtubeVideoId)) return 'youtube';
-  if (song.youtubeUrl && (song.youtubeUrl.includes('youtube.com') || song.youtubeUrl.includes('youtu.be'))) return 'youtube';
-  if (song.audioUrl && (song.audioUrl.includes('youtube.com') || song.audioUrl.includes('youtu.be'))) return 'youtube';
+  // Check if offline audio blob is stored locally
+  if (song.id && getOfflineSongBlobUrl(song.id)) return 'direct';
+  const vid = song.youtubeVideoId || 
+    (song.youtubeUrl ? extractYoutubeVideoId(song.youtubeUrl) : null) || 
+    (song.audioUrl && (song.audioUrl.includes('youtube.com') || song.audioUrl.includes('youtu.be')) ? extractYoutubeVideoId(song.audioUrl) : null) ||
+    (song.id.startsWith('yt_') ? song.id.replace('yt_', '') : null);
+  if (vid || song.source === 'youtube' || song.sourceType === 'YOUTUBE') {
+    return 'youtube';
+  }
   return 'direct';
 }
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
-  const [audioMode, setAudioMode] = useState<string>('normal');
   const [queue, setQueue] = useState<Song[]>([]);
   const [originalQueue, setOriginalQueue] = useState<Song[]>([]);
   const [isShuffle, setIsShuffle] = useState<boolean>(() => {
@@ -156,11 +179,102 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [diagnosticInfo, setDiagnosticInfo] = useState<PlaybackDiagnosticInfo | null>(null);
   
-  // YouTube Dock View State (Deprecated - floating dock removed)
-  const [isYoutubeDockVisible, setIsYoutubeDockVisible] = useState(false);
-  const [isYoutubeDockMinimized, setIsYoutubeDockMinimized] = useState(false);
+  // Network Status and Buffering UI States
+  const [networkStatus, setNetworkStatus] = useState<NetworkPlaybackStatus>('idle');
+  const [networkStatusText, setNetworkStatusText] = useState<string | null>(null);
+  const [currentSourceBadge, setCurrentSourceBadge] = useState<PlaybackSourceBadge>('Online streaming');
+  const isRecoveringFromDisconnectRef = useRef<boolean>(false);
+  const localBlobUrlCacheRef = useRef<Map<string, string>>(new Map());
 
-  // Native Audio & YouTube Player References
+  // Data Saver Integration
+  const [dataSaverSettings, setDataSaverSettings] = useState<DataSaverSettings>(() => getDataSaverSettings());
+  const [isDataSaverModalOpen, setIsDataSaverModalOpen] = useState(false);
+
+  const openDataSaverModal = useCallback(() => setIsDataSaverModalOpen(true), []);
+  const closeDataSaverModal = useCallback(() => setIsDataSaverModalOpen(false), []);
+  const toggleDataSaver = useCallback(() => {
+    import('../services/dataSaverService').then(({ saveDataSaverSettings }) => {
+      saveDataSaverSettings({ dataSaver: !dataSaverSettings.dataSaver });
+    });
+  }, [dataSaverSettings.dataSaver]);
+
+  // Network Connectivity and Data Saver subscription
+  useEffect(() => {
+    const unsubDataSaver = subscribeToDataSaver((newSettings) => {
+      setDataSaverSettings(newSettings);
+    });
+
+    const handleOnline = () => {
+      if (isRecoveringFromDisconnectRef.current && currentSong) {
+        setNetworkStatus('reconnecting');
+        setNetworkStatusText('Reconnecting…');
+        setTimeout(() => {
+          if (currentSong && audioRef.current && isPlaying) {
+            audioRef.current.play().catch(() => {});
+          }
+          isRecoveringFromDisconnectRef.current = false;
+          setNetworkStatus('idle');
+          setNetworkStatusText(null);
+        }, 1200);
+      } else {
+        setNetworkStatus('idle');
+        setNetworkStatusText(null);
+      }
+    };
+
+    const handleOffline = () => {
+      if (isPlaying || isLoading || isBuffering) {
+        const localBlob = localBlobUrlCacheRef.current.get(currentSong?.id || '') || getOfflineSongBlobUrl(currentSong?.id || '');
+        if (localBlob && audioRef.current) {
+          if (audioRef.current.src !== localBlob) {
+            const currentPos = audioRef.current.currentTime || progress;
+            audioRef.current.src = localBlob;
+            audioRef.current.currentTime = currentPos;
+            audioRef.current.play().catch(() => {});
+            setCurrentSourceBadge('Downloaded / Offline');
+            setNetworkStatus('idle');
+            setNetworkStatusText(null);
+            return;
+          }
+        }
+        isRecoveringFromDisconnectRef.current = true;
+        setNetworkStatus('reconnecting');
+        setNetworkStatusText('Connection lost — reconnecting…');
+      } else {
+        setNetworkStatus('offline');
+        setNetworkStatusText('Offline mode');
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Monitor slow mobile network conditions if NetworkInformation API is supported
+    const navConn = (typeof navigator !== 'undefined' ? (navigator as any).connection : null);
+    const checkNetworkCondition = () => {
+      if (navConn && (isPlaying || isBuffering)) {
+        if (navConn.effectiveType === '2g' || navConn.effectiveType === 'slow-2g' || (navConn.downlink && navConn.downlink < 0.4)) {
+          setNetworkStatus('slow_connection');
+          setNetworkStatusText('Slow internet connection');
+        }
+      }
+    };
+
+    if (navConn && navConn.addEventListener) {
+      navConn.addEventListener('change', checkNetworkCondition);
+    }
+
+    return () => {
+      unsubDataSaver();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      if (navConn && navConn.removeEventListener) {
+        navConn.removeEventListener('change', checkNetworkCondition);
+      }
+    };
+  }, [currentSong, isPlaying, isLoading, isBuffering, progress]);
+  
+  // Native Audio Player References
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const youtubePlayerRef = useRef<any>(null);
   const resumeTimeRef = useRef<number | null>(null);
@@ -237,13 +351,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const toggleYoutubeDock = useCallback(() => {
-    setIsYoutubeDockVisible(prev => !prev);
-  }, []);
-
-  const toggleYoutubeDockMinimized = useCallback(() => {
-    setIsYoutubeDockMinimized(prev => !prev);
-  }, []);
+  const toggleYoutubeDock = useCallback(() => {}, []);
+  const toggleYoutubeDockMinimized = useCallback(() => {}, []);
 
   const [activePlaylistId, setActivePlaylistId] = useState<string | undefined>(undefined);
   const [activeBannerAd, setActiveBannerAd] = useState<AdCampaign | null>(null);
@@ -614,24 +723,34 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (offlineBlobUrl) {
       return offlineBlobUrl;
     }
-    
-    // Check YouTube ID
-    if (song.youtubeVideoId && /^[a-zA-Z0-9_-]{11}$/.test(song.youtubeVideoId)) {
-      return `https://www.youtube.com/watch?v=${song.youtubeVideoId}`;
+
+    const type = getTrackSourceType(song);
+    if (type === 'youtube') {
+      const videoId = song.youtubeVideoId || 
+        (song.youtubeUrl ? extractYoutubeVideoId(song.youtubeUrl) : null) || 
+        (song.audioUrl ? extractYoutubeVideoId(song.audioUrl) : null) || 
+        (song.id.startsWith('yt_') ? song.id.replace('yt_', '') : null);
+      if (videoId) {
+        return `https://www.youtube.com/watch?v=${videoId}`;
+      }
+      return '';
     }
 
-    // Check youtubeUrl
-    if (song.youtubeUrl) {
-      const vid = extractYoutubeVideoId(song.youtubeUrl);
-      if (vid) return `https://www.youtube.com/watch?v=${vid}`;
-      return song.youtubeUrl;
+    // Direct audio stream / file URL
+    const directUrl = song.audioUrl || song.sourceUrl || (song as any).mediaUrl || (song as any).fileUrl || (song as any).streamUrl || (song as any).url || (song as any).audio || (song as any).previewUrl;
+    if (directUrl && typeof directUrl === 'string') {
+      const trimmed = directUrl.trim();
+      if (trimmed.includes('youtube.com') || trimmed.includes('youtu.be')) {
+        const vid = extractYoutubeVideoId(trimmed);
+        return vid ? `https://www.youtube.com/watch?v=${vid}` : '';
+      }
+      return trimmed;
     }
 
-    // Check audioUrl
-    if (song.audioUrl) {
-      const vid = extractYoutubeVideoId(song.audioUrl);
-      if (vid) return `https://www.youtube.com/watch?v=${vid}`;
-      return song.audioUrl;
+    // Catalog fallback: If matching song in FALLBACK_SONGS has audioUrl, use that
+    const fallbackMatch = FALLBACK_SONGS.find(f => f.id === song.id || f.title.toLowerCase() === song.title.toLowerCase());
+    if (fallbackMatch?.audioUrl) {
+      return fallbackMatch.audioUrl;
     }
 
     return '';
@@ -679,13 +798,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     });
   }, [currentSong, playableUrl, currentSourceType, progress, duration, playbackState]);
 
-  // Synchronize native audio element with state changes
+  // Synchronize native audio element with state changes safely without resetting playing stream
   useEffect(() => {
     if (currentSourceType === 'direct') {
       const audio = audioRef.current;
-      if (!audio) return;
+      if (!audio || !playableUrl) return;
 
-      if (playableUrl && audio.src !== playableUrl && !audio.src.endsWith(playableUrl)) {
+      const currentSrc = audio.currentSrc || audio.src;
+      const isSameSrc = Boolean(
+        currentSrc === playableUrl ||
+        (playableUrl.startsWith('/') && currentSrc.endsWith(playableUrl)) ||
+        (playableUrl.startsWith('http') && currentSrc.includes(playableUrl))
+      );
+
+      if (!isSameSrc) {
         audio.src = playableUrl;
         audio.playbackRate = playbackRate;
         audio.volume = effectiveVolume;
@@ -695,6 +821,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
               console.warn('[Direct Audio Play Error]:', err);
             }
           });
+        }
+      } else {
+        audio.playbackRate = playbackRate;
+        audio.volume = effectiveVolume;
+        if (isPlaying && audio.paused) {
+          audio.play().catch((err) => {
+            if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
+              console.warn('[Direct Audio Play Error]:', err);
+            }
+          });
+        } else if (!isPlaying && !audio.paused) {
+          audio.pause();
         }
       }
     }
@@ -721,24 +859,26 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const safeTime = Math.max(0, Math.min(time, duration || 9999));
     setProgress(safeTime);
 
-    if (currentSourceType === 'direct' && audioRef.current) {
-      try {
-        audioRef.current.currentTime = safeTime;
-      } catch (err) {
-        console.warn('[Direct Audio Seek Error]:', err);
-      }
-    } else if (currentSourceType === 'youtube' && youtubePlayerRef.current) {
+    if (currentSourceType === 'youtube' && youtubePlayerRef.current) {
       try {
         if (typeof youtubePlayerRef.current.seekTo === 'function') {
           youtubePlayerRef.current.seekTo(safeTime, 'seconds');
         } else if ('currentTime' in youtubePlayerRef.current) {
           youtubePlayerRef.current.currentTime = safeTime;
         }
-      } catch (e) {
-        console.warn('[YouTube Seek Error]:', e);
+      } catch (err) {
+        console.warn('[YouTube Seek Error]:', err);
       }
     }
-  }, [currentSourceType, duration, isPlaying]);
+
+    if (currentSourceType === 'direct' && audioRef.current) {
+      try {
+        audioRef.current.currentTime = safeTime;
+      } catch (err) {
+        console.warn('[Direct Audio Seek Error]:', err);
+      }
+    }
+  }, [duration, isPlaying, currentSourceType]);
 
   // Throttled position saving
   const handleThrottledPositionSave = useCallback((currentTime: number) => {
@@ -759,11 +899,162 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [currentSong, duration]);
 
+  // ================= YouTube Player Callbacks =================
+  const handleYoutubeReady = () => {
+    if (currentSourceType === 'youtube') {
+      setIsLoading(false);
+      setIsBuffering(false);
+      setNetworkStatus('idle');
+      setNetworkStatusText(null);
+      checkAndApplyResume();
+    }
+  };
+
+  const handleYoutubeStart = () => {
+    if (currentSourceType === 'youtube') {
+      setIsLoading(false);
+      setIsBuffering(false);
+      setPlaybackState('playing');
+      setNetworkStatus('idle');
+      setNetworkStatusText(null);
+    }
+  };
+
+  const handleYoutubePlay = () => {
+    if (currentSourceType === 'youtube') {
+      setIsPlaying(true);
+      setIsLoading(false);
+      setIsBuffering(false);
+      setPlaybackState('playing');
+      setNetworkStatus('idle');
+      setNetworkStatusText(null);
+      watchTimeRef.current.lastActiveTimestamp = Date.now();
+      retryCountRef.current = 0;
+      checkAndApplyResume();
+
+      if (currentSong) {
+        try {
+          const stored = localStorage.getItem('sbg_recently_played');
+          let recent = stored ? JSON.parse(stored) : [];
+          recent = recent.filter((s: Song) => s.id !== currentSong.id);
+          recent = [currentSong, ...recent].slice(0, 20);
+          localStorage.setItem('sbg_recently_played', JSON.stringify(recent));
+          window.dispatchEvent(new Event('recently_played_updated'));
+        } catch {}
+      }
+    }
+  };
+
+  const handleYoutubePause = () => {
+    if (currentSourceType === 'youtube') {
+      setIsBuffering(false);
+      flushWatchTime(false);
+      watchTimeRef.current.lastActiveTimestamp = null;
+      setPlaybackState('paused');
+      if (networkStatus !== 'offline') {
+        setNetworkStatus('idle');
+        setNetworkStatusText(null);
+      }
+      if (currentSong) {
+        recordPlaybackPause(currentSong, {
+          playlistId: activePlaylistId,
+          currentTime: progress,
+        });
+        if (progress > 3 && duration - progress > 4) {
+          saveSongPlaybackPosition(currentSong.id, progress, duration);
+          try {
+            localStorage.setItem('sbg_continue_listening', JSON.stringify({
+              song: currentSong,
+              progress,
+              duration,
+              timestamp: Date.now(),
+            }));
+            window.dispatchEvent(new Event('continue_listening_updated'));
+          } catch {}
+        }
+      }
+    }
+  };
+
+  const handleYoutubeBuffer = () => {
+    if (currentSourceType === 'youtube') {
+      setIsBuffering(true);
+      setPlaybackState('buffering');
+      setNetworkStatus('buffering');
+      setNetworkStatusText('Buffering…');
+    }
+  };
+
+  const handleYoutubeBufferEnd = () => {
+    if (currentSourceType === 'youtube') {
+      setIsBuffering(false);
+      setPlaybackState('playing');
+      setNetworkStatus('idle');
+      setNetworkStatusText(null);
+    }
+  };
+
+  const handleYoutubeProgress = (stateOrEvent: any) => {
+    if (currentSourceType === 'youtube') {
+      const played = typeof stateOrEvent?.playedSeconds === 'number'
+        ? stateOrEvent.playedSeconds
+        : (stateOrEvent?.currentTarget?.currentTime ?? stateOrEvent?.currentTime);
+      if (typeof played === 'number' && !isNaN(played)) {
+        setProgress(played);
+        handleThrottledPositionSave(played);
+      }
+    }
+  };
+
+  const handleYoutubeDuration = (durOrEvent: any) => {
+    if (currentSourceType === 'youtube') {
+      const dur = typeof durOrEvent === 'number'
+        ? durOrEvent
+        : (durOrEvent?.currentTarget?.duration ?? durOrEvent?.duration);
+      if (dur && !isNaN(dur) && dur > 0) {
+        setDuration(dur);
+      }
+    }
+  };
+
+  const handleYoutubeError = (err: any) => {
+    if (currentSourceType !== 'youtube') return;
+
+    let errCode: string | number = 'YT_ERROR';
+    let userMsg = 'Playback unavailable for this track.';
+
+    const code = typeof err === 'number' ? err : err?.data || err?.target?.getErrorCode?.() || err?.code;
+    if (code === 101 || code === 150) {
+      errCode = code;
+      userMsg = 'Playback unavailable: embedding is restricted by the content owner.';
+    } else if (code === 100) {
+      errCode = 100;
+      userMsg = 'This YouTube track is private or has been removed.';
+    } else if (code === 2) {
+      errCode = 2;
+      userMsg = 'Invalid YouTube track parameters.';
+    } else if (code === 5) {
+      errCode = 5;
+      userMsg = 'HTML5 playback error for this YouTube track.';
+    }
+
+    recordDiagnostic(errCode, userMsg);
+    setIsLoading(false);
+    setIsBuffering(false);
+    setIsPlaying(false);
+    setPlaybackState('error');
+    setNetworkStatus('error');
+    setNetworkStatusText('Playback unavailable');
+    setPlaybackError(userMsg);
+  };
+
   // ================= Direct Audio Engine Callbacks =================
   const handleNativeLoadStart = () => {
     setIsLoading(true);
     setPlaybackState('loading');
     setPlaybackError(null);
+    setNetworkStatus('loading');
+    setNetworkStatusText('Loading song…');
   };
 
   const handleNativeLoadedMetadata = (e: React.SyntheticEvent<HTMLAudioElement>) => {
@@ -778,6 +1069,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const handleNativeCanPlay = () => {
     setIsLoading(false);
     setIsBuffering(false);
+    setNetworkStatus('idle');
+    setNetworkStatusText(null);
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current);
       retryTimeoutRef.current = null;
@@ -794,6 +1087,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
     setIsBuffering(false);
     setPlaybackState('playing');
+    setNetworkStatus('idle');
+    setNetworkStatusText(null);
     watchTimeRef.current.lastActiveTimestamp = Date.now();
     retryCountRef.current = 0;
     if (retryTimeoutRef.current) {
@@ -803,7 +1098,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     checkAndApplyResume();
 
     if (currentSong) {
-      autoCacheActiveTrack(currentSong);
+      // NOTE: Removed autoCacheActiveTrack to prevent duplicate audio requests & respect user data limits
       try {
         const stored = localStorage.getItem('sbg_recently_played');
         let recent = stored ? JSON.parse(stored) : [];
@@ -818,6 +1113,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const handleNativeWaiting = () => {
     setIsBuffering(true);
     setPlaybackState('buffering');
+    setNetworkStatus('buffering');
+    setNetworkStatusText('Buffering…');
     if (watchTimeRef.current.lastActiveTimestamp) {
       const elapsed = (Date.now() - watchTimeRef.current.lastActiveTimestamp) / 1000;
       if (elapsed > 0 && elapsed < 120) {
@@ -828,26 +1125,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   };
 
   const handleNativeStalled = () => {
-    setIsBuffering(true);
-    setPlaybackState('buffering');
-
-    // Bounded retry policy: wait 3.5s for natural browser buffer recovery
-    if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-    retryTimeoutRef.current = setTimeout(() => {
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    if (isOffline) {
+      setIsBuffering(true);
+      setPlaybackState('buffering');
+      setNetworkStatus('reconnecting');
+      setNetworkStatusText('Connection lost — reconnecting…');
+    } else {
       const audio = audioRef.current;
-      if (audio && isPlaying && retryCountRef.current < 3) {
-        retryCountRef.current += 1;
-        const currentPos = audio.currentTime || 0;
-        console.log(`[Audio Engine] Bounded recovery attempt ${retryCountRef.current}/3 at position ${currentPos.toFixed(1)}s`);
-        audio.load();
-        audio.currentTime = currentPos;
-        audio.play().catch(() => {});
-      } else if (retryCountRef.current >= 3) {
-        setPlaybackState('error');
-        setPlaybackError('Network connection is unstable. Tap play to retry.');
-        recordDiagnostic('STALLED_MAX_RETRIES', 'Stream stalled and exceeded retry threshold.');
+      // Only mark buffering if audio is actually waiting or readyState is insufficient
+      if (audio && audio.readyState < 3 && !audio.paused) {
+        setIsBuffering(true);
       }
-    }, 3500);
+    }
   };
 
   const handleNativeTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement>) => {
@@ -871,6 +1161,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     watchTimeRef.current.lastActiveTimestamp = null;
     setPlaybackState('paused');
 
+    // Strict rule: Do not show a network warning merely because a song is paused or has ended.
+    if (networkStatus !== 'offline') {
+      setNetworkStatus('idle');
+      setNetworkStatusText(null);
+    }
+
     if (currentSong) {
       recordPlaybackPause(currentSong, {
         playlistId: activePlaylistId,
@@ -893,105 +1189,37 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const handleNativeError = (e: React.SyntheticEvent<HTMLAudioElement, Event>) => {
     const audio = e.currentTarget;
+    if (currentSourceType !== 'direct') return;
+    if (!audio.src || !audio.currentSrc || audio.src === window.location.href) return;
+
     const mediaErr = audio.error;
     let errCode: string | number = mediaErr?.code || 'UNKNOWN';
-    let userMsg = 'Unable to play this track. Please check connection and try again.';
+    let userMsg = 'Playback failed — Retry';
 
-    if (mediaErr?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-      userMsg = 'This audio source is unavailable or unsupported on this device.';
-    } else if (mediaErr?.code === MediaError.MEDIA_ERR_NETWORK) {
-      userMsg = 'Network error while streaming audio. Reconnecting…';
-    } else if (mediaErr?.code === MediaError.MEDIA_ERR_DECODE) {
-      userMsg = 'Audio decoding error on this device.';
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    if (isOffline) {
+      userMsg = 'Connect to the internet to stream this song.';
+      setNetworkStatus('offline');
+      setNetworkStatusText('Offline mode');
+    } else {
+      if (mediaErr?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+        userMsg = 'This audio source is unavailable or unsupported on this device.';
+      } else if (mediaErr?.code === MediaError.MEDIA_ERR_NETWORK) {
+        userMsg = 'Network error while streaming audio. Reconnecting…';
+        setNetworkStatus('reconnecting');
+        setNetworkStatusText('Reconnecting…');
+      } else if (mediaErr?.code === MediaError.MEDIA_ERR_DECODE) {
+        userMsg = 'Audio decoding error on this device.';
+      }
+      setNetworkStatus('error');
+      setNetworkStatusText('Playback failed — Retry');
     }
 
     recordDiagnostic(errCode, userMsg);
     setIsLoading(false);
     setIsBuffering(false);
-    setPlaybackState('error');
+    setPlaybackState(isOffline ? 'offline' : 'error');
     setPlaybackError(userMsg);
-  };
-
-  // ================= YouTube Player Engine Callbacks =================
-  const handleYoutubeReady = () => {
-    setIsLoading(false);
-    setIsBuffering(false);
-    checkAndApplyResume();
-  };
-
-  const handleYoutubeStart = () => {
-    setIsPlaying(true);
-    setIsLoading(false);
-    setIsBuffering(false);
-    setPlaybackState('playing');
-    watchTimeRef.current.lastActiveTimestamp = Date.now();
-    checkAndApplyResume();
-  };
-
-  const handleYoutubePlay = () => {
-    setIsPlaying(true);
-    setIsLoading(false);
-    setIsBuffering(false);
-    setPlaybackState('playing');
-    watchTimeRef.current.lastActiveTimestamp = Date.now();
-    checkAndApplyResume();
-  };
-
-  const handleYoutubePlaying = () => {
-    setIsPlaying(true);
-    setIsLoading(false);
-    setIsBuffering(false);
-    setPlaybackState('playing');
-    watchTimeRef.current.lastActiveTimestamp = Date.now();
-    checkAndApplyResume();
-  };
-
-  const handleYoutubePause = () => {
-    setIsBuffering(false);
-    flushWatchTime(false);
-    watchTimeRef.current.lastActiveTimestamp = null;
-    setPlaybackState('paused');
-
-    if (currentSong) {
-      recordPlaybackPause(currentSong, {
-        playlistId: activePlaylistId,
-        currentTime: progress,
-      });
-      if (progress > 3 && (duration - progress > 4)) {
-        saveSongPlaybackPosition(currentSong.id, progress, duration);
-      }
-    }
-  };
-
-  const handleYoutubeWaiting = () => {
-    setIsBuffering(true);
-    setPlaybackState('buffering');
-  };
-
-  const handleYoutubeProgress = (state: any) => {
-    if (state && typeof state.playedSeconds === 'number' && !isNaN(state.playedSeconds)) {
-      setProgress(state.playedSeconds);
-      handleThrottledPositionSave(state.playedSeconds);
-    }
-  };
-
-  const handleYoutubeDuration = (d: any) => {
-    if (typeof d === 'number' && !isNaN(d) && d > 0) {
-      setDuration(d);
-    } else if (d && typeof d.duration === 'number' && !isNaN(d.duration) && d.duration > 0) {
-      setDuration(d.duration);
-    }
-  };
-
-  const handleYoutubeError = (error: any) => {
-    if (error?.name === 'AbortError' || error?.message?.includes('interrupted by a call to pause')) {
-      return;
-    }
-    recordDiagnostic('YOUTUBE_PLAYER_ERROR', error?.message || 'YouTube player error');
-    setIsLoading(false);
-    setIsBuffering(false);
-    setPlaybackState('error');
-    setPlaybackError('Playback issue: video may be age-restricted or embed-disabled on YouTube.');
   };
 
   // Shared Track Ended Handler
@@ -1005,7 +1233,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     } catch {}
 
     if (isVoiceAdPlaying && activeVoiceAd) {
-      await recordVoiceAdCompletion(activeVoiceAd.id);
+      if (activeVoiceAd.id) {
+        await recordVoiceAdCompletion(activeVoiceAd.id);
+      }
       setIsVoiceAdPlaying(false);
       setActiveVoiceAd(null);
       if (queue.length > 0 && currentIndex < queue.length - 1) {
@@ -1033,7 +1263,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           const voiceAds = await fetchActiveCampaigns(undefined, 'voice');
           if (voiceAds.length > 0) {
             const chosen = voiceAds[Math.floor(Math.random() * voiceAds.length)];
-            if (chosen.audioUrl) {
+            if (chosen.audioUrl && chosen.id) {
               setActiveVoiceAd(chosen);
               setIsVoiceAdPlaying(true);
               await recordVoiceAdPlay(chosen.id);
@@ -1048,8 +1278,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           const bannerAds = await fetchActiveCampaigns(undefined, 'banner');
           if (bannerAds.length > 0) {
             const chosen = bannerAds[Math.floor(Math.random() * bannerAds.length)];
-            setActiveBannerAd(chosen);
-            await recordAdImpression(chosen.id);
+            if (chosen.id) {
+              setActiveBannerAd(chosen);
+              await recordAdImpression(chosen.id);
+            }
           }
         }
       }
@@ -1079,7 +1311,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   };
 
   // Play Song authoritative transition
-  const playSong = (song: Song, newQueue?: Song[], playlistId?: string, resumeTime?: number, explicitSource?: string) => {
+  const playSong = async (song: Song, newQueue?: Song[], playlistId?: string, resumeTime?: number, explicitSource?: string) => {
     if (currentSong && currentSong.id !== song.id && progress > 3 && (duration - progress > 4)) {
       saveSongPlaybackPosition(currentSong.id, progress, duration);
     }
@@ -1092,6 +1324,43 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setPlaybackError(null);
     setDiagnosticInfo(null);
     setIsPlayerDismissed(false);
+    retryCountRef.current = 0;
+
+    // 1. PLAYBACK SOURCE PRIORITY & OFFLINE RESOLUTION
+    // Check if eligible local download exists on user device
+    let localBlobUrl = localBlobUrlCacheRef.current.get(song.id) || getOfflineSongBlobUrl(song.id);
+    if (!localBlobUrl) {
+      localBlobUrl = await resolveOfflineSongBlobUrl(song.id);
+      if (localBlobUrl) {
+        localBlobUrlCacheRef.current.set(song.id, localBlobUrl);
+      }
+    }
+
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    // Rule 3: If offline and NO local download file exists, show clear message and stop
+    if (isOffline && !localBlobUrl) {
+      setCurrentSong(song);
+      setIsPlaying(false);
+      setIsLoading(false);
+      setIsBuffering(false);
+      setPlaybackState('offline');
+      setNetworkStatus('offline');
+      setNetworkStatusText('Offline mode');
+      setPlaybackError('Connect to the internet to stream this song.');
+      setCurrentSourceBadge('Online streaming');
+      return;
+    }
+
+    // Set appropriate source badge
+    if (localBlobUrl) {
+      setCurrentSourceBadge('Downloaded / Offline');
+    } else {
+      setCurrentSourceBadge('Online streaming');
+    }
+
+    setNetworkStatus('connecting');
+    setNetworkStatusText('Connecting…');
 
     if (watchTimeRef.current.song && watchTimeRef.current.song.id !== song.id) {
       flushWatchTime(false);
@@ -1101,9 +1370,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setActivePlaylistId(playlistId);
     }
 
-    const nextSourceType = getTrackSourceType(song);
+    const nextSourceType = 'direct';
     const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
-    let detectedSource = explicitSource || 'Home';
+    let detectedSource = explicitSource || (localBlobUrl ? 'Offline Storage' : 'Home');
 
     if (!explicitSource) {
       if (playlistId || currentPath.includes('/playlist')) detectedSource = 'Playlist';
@@ -1111,7 +1380,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       else if (currentPath.includes('/favorites')) detectedSource = 'Favorites';
       else if (currentPath.includes('/library')) detectedSource = 'Library';
       else if (currentPath.includes('/song/')) detectedSource = 'Song Page';
-      else if (nextSourceType === 'youtube') detectedSource = 'YouTube';
     }
 
     watchTimeRef.current = {
@@ -1124,12 +1392,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       isCompleted: false,
     };
 
-    recordPlaybackStart(song, {
-      playlistId: playlistId || activePlaylistId,
-      playbackSource: detectedSource,
-      currentTime: typeof resumeTime === 'number' && resumeTime > 0 ? resumeTime : 0,
-    }, { immediate: true }).catch(() => {});
-    watchTimeRef.current.hasFlushedPlayStart = true;
+    if (!isOffline) {
+      recordPlaybackStart(song, {
+        playlistId: playlistId || activePlaylistId,
+        playbackSource: detectedSource,
+        currentTime: typeof resumeTime === 'number' && resumeTime > 0 ? resumeTime : 0,
+      }, { immediate: true }).catch(() => {});
+      watchTimeRef.current.hasFlushedPlayStart = true;
+    }
 
     if (newQueue && newQueue.length > 0) {
       setQueue(newQueue);
@@ -1152,28 +1422,32 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // If track is a YouTube-only video, open on YouTube with official video, player, and attribution
-    if (nextSourceType === 'youtube') {
-      const ytUrl = song.youtubeUrl || (song.youtubeVideoId ? `https://www.youtube.com/watch?v=${song.youtubeVideoId}` : '');
-      if (ytUrl) {
-        window.open(ytUrl, '_blank', 'noopener,noreferrer');
-        setShareToast(`Opening "${song.title}" on YouTube...`);
-        setTimeout(() => setShareToast(null), 3000);
-      }
-      return;
-    }
-
     setIsLoading(true);
     setPlaybackState('loading');
+    setNetworkStatus('loading');
+    setNetworkStatusText('Loading song…');
     setCurrentSong(song);
     setIsPlaying(true);
     setProgress(0);
     setDuration(song.durationSeconds || song.duration || 0);
 
-    // If next is direct audio, prepare audio element immediately
-    if (nextSourceType === 'direct') {
-      const url = getPlayableUrl(song);
-      if (audioRef.current && url) {
+    const resolvedSourceType = localBlobUrl ? 'direct' : getTrackSourceType(song);
+    const url = localBlobUrl || getPlayableUrl(song);
+    if (!url) {
+      setIsLoading(false);
+      setIsPlaying(false);
+      setPlaybackState('error');
+      setNetworkStatus('error');
+      setNetworkStatusText('Playback unavailable');
+      setPlaybackError(resolvedSourceType === 'youtube'
+        ? 'Invalid or unavailable YouTube track ID.'
+        : 'Audio stream is not available for this track.');
+      recordDiagnostic('NO_AUDIO_STREAM', 'Track does not contain a playable audio stream.');
+      return;
+    }
+
+    if (resolvedSourceType === 'direct') {
+      if (audioRef.current) {
         audioRef.current.src = url;
         audioRef.current.playbackRate = playbackRate;
         audioRef.current.volume = effectiveVolume;
@@ -1182,6 +1456,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             console.warn('[Direct Audio Play Error]:', err);
           }
         });
+      }
+    } else {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.removeAttribute('src');
       }
     }
   };
@@ -1242,27 +1521,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setCurrentIndex(safeIndex);
     }
 
-    const nextSource = getTrackSourceType(firstSong);
-    if (currentSourceType === 'direct' && nextSource === 'youtube' && audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.removeAttribute('src');
-      audioRef.current.load();
-    }
-
     setCurrentSong(firstSong);
     setIsPlaying(true);
     setPlaybackState('loading');
     setProgress(0);
     setDuration(firstSong.durationSeconds || firstSong.duration || 0);
 
-    if (nextSource === 'direct') {
-      const url = getPlayableUrl(firstSong);
-      if (audioRef.current && url) {
-        audioRef.current.src = url;
-        audioRef.current.playbackRate = playbackRate;
-        audioRef.current.volume = effectiveVolume;
-        audioRef.current.play().catch(() => {});
-      }
+    const firstSourceType = getTrackSourceType(firstSong);
+    const url = getPlayableUrl(firstSong);
+    if (firstSourceType === 'direct' && audioRef.current && url) {
+      audioRef.current.src = url;
+      audioRef.current.playbackRate = playbackRate;
+      audioRef.current.volume = effectiveVolume;
+      audioRef.current.play().catch(() => {});
+    } else if (firstSourceType === 'youtube' && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute('src');
     }
   };
 
@@ -1287,27 +1561,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       isCompleted: false,
     };
 
-    const nextSource = getTrackSourceType(nextSong);
-    if (currentSourceType === 'direct' && nextSource === 'youtube' && audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.removeAttribute('src');
-      audioRef.current.load();
-    }
-
     setCurrentIndex(nextIdx);
     setCurrentSong(nextSong);
     setIsPlaying(true);
     setProgress(0);
     setDuration(nextSong.durationSeconds || nextSong.duration || 0);
 
-    if (nextSource === 'direct') {
-      const url = getPlayableUrl(nextSong);
-      if (audioRef.current && url) {
-        audioRef.current.src = url;
-        audioRef.current.playbackRate = playbackRate;
-        audioRef.current.volume = effectiveVolume;
-        audioRef.current.play().catch(() => {});
-      }
+    const nextSourceType = getTrackSourceType(nextSong);
+    const url = getPlayableUrl(nextSong);
+    if (nextSourceType === 'direct' && audioRef.current && url) {
+      audioRef.current.src = url;
+      audioRef.current.playbackRate = playbackRate;
+      audioRef.current.volume = effectiveVolume;
+      audioRef.current.play().catch(() => {});
+    } else if (nextSourceType === 'youtube' && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute('src');
     }
   };
 
@@ -1332,27 +1601,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       isCompleted: false,
     };
 
-    const nextSource = getTrackSourceType(prevSong);
-    if (currentSourceType === 'direct' && nextSource === 'youtube' && audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.removeAttribute('src');
-      audioRef.current.load();
-    }
-
     setCurrentIndex(prevIdx);
     setCurrentSong(prevSong);
     setIsPlaying(true);
     setProgress(0);
     setDuration(prevSong.durationSeconds || prevSong.duration || 0);
 
-    if (nextSource === 'direct') {
-      const url = getPlayableUrl(prevSong);
-      if (audioRef.current && url) {
-        audioRef.current.src = url;
-        audioRef.current.playbackRate = playbackRate;
-        audioRef.current.volume = effectiveVolume;
-        audioRef.current.play().catch(() => {});
-      }
+    const prevSourceType = getTrackSourceType(prevSong);
+    const url = getPlayableUrl(prevSong);
+    if (prevSourceType === 'direct' && audioRef.current && url) {
+      audioRef.current.src = url;
+      audioRef.current.playbackRate = playbackRate;
+      audioRef.current.volume = effectiveVolume;
+      audioRef.current.play().catch(() => {});
+    } else if (prevSourceType === 'youtube' && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute('src');
     }
   };
 
@@ -1389,18 +1653,39 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setDiagnosticInfo(null);
     setIsLoading(true);
     setPlaybackState('loading');
+    setNetworkStatus('loading');
+    setNetworkStatusText('Loading song…');
     retryCountRef.current = 0;
 
-    if (currentSourceType === 'direct' && audioRef.current) {
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    const localBlob = localBlobUrlCacheRef.current.get(currentSong.id) || getOfflineSongBlobUrl(currentSong.id);
+
+    if (isOffline && !localBlob) {
+      setIsLoading(false);
+      setIsPlaying(false);
+      setPlaybackState('offline');
+      setNetworkStatus('offline');
+      setNetworkStatusText('Offline mode');
+      setPlaybackError('Connect to the internet to stream this song.');
+      return;
+    }
+
+    if (currentSourceType === 'youtube') {
+      setIsPlaying(true);
+      if (youtubePlayerRef.current) {
+        try {
+          if (typeof youtubePlayerRef.current.seekTo === 'function') {
+            youtubePlayerRef.current.seekTo(progress, 'seconds');
+          } else if ('currentTime' in youtubePlayerRef.current) {
+            youtubePlayerRef.current.currentTime = progress;
+          }
+        } catch {}
+      }
+    } else if (audioRef.current) {
       const cur = progress;
       audioRef.current.load();
       audioRef.current.currentTime = cur;
       audioRef.current.play().catch(() => {});
-    } else {
-      setIsPlaying(false);
-      setTimeout(() => {
-        setIsPlaying(true);
-      }, 100);
     }
   };
 
@@ -1627,8 +1912,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         activeBannerAd,
         activeVoiceAd,
         isVoiceAdPlaying,
-        isYoutubeDockVisible,
-        isYoutubeDockMinimized,
+        isYoutubeDockVisible: false,
+        isYoutubeDockMinimized: false,
         toggleYoutubeDock,
         toggleYoutubeDockMinimized,
         retryPlayback,
@@ -1678,11 +1963,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         shareToast,
         repeatMode,
         toggleRepeatMode,
-        audioMode,
-        setAudioMode,
+        networkStatus,
+        networkStatusText,
+        currentSourceBadge,
+        dataSaverSettings,
+        isDataSaverModalOpen,
+        openDataSaverModal,
+        closeDataSaverModal,
+        toggleDataSaver,
       }}
     >
       {children}
+
+      {/* Data Saver Settings Modal */}
+      <DataSaverModal
+        isOpen={isDataSaverModalOpen}
+        onClose={closeDataSaverModal}
+      />
 
       {/* Share Toast */}
       {shareToast && (
@@ -1712,6 +2009,64 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         style={{ display: 'none' }}
       />
 
+      {/* 
+        Offscreen YouTube Player for Streamed YouTube Tracks
+        Operates without visible video overlay as an audio-driven player with valid embed dimensions
+      */}
+      <div
+        style={{
+          position: 'fixed',
+          top: '-9999px',
+          left: '-9999px',
+          width: '240px',
+          height: '240px',
+          opacity: 1,
+          pointerEvents: 'none',
+          visibility: 'visible',
+          zIndex: -9999,
+        }}
+        aria-hidden="true"
+      >
+        <PlayerComponent
+          ref={youtubePlayerRef}
+          src={currentSourceType === 'youtube' && playableUrl ? playableUrl : undefined}
+          url={currentSourceType === 'youtube' && playableUrl ? playableUrl : undefined}
+          playing={currentSourceType === 'youtube' && isPlaying}
+          volume={effectiveVolume}
+          playbackRate={playbackRate}
+          controls={false}
+          width="100%"
+          height="100%"
+          onReady={handleYoutubeReady}
+          onStart={handleYoutubeStart}
+          onPlay={handleYoutubePlay}
+          onPause={handleYoutubePause}
+          onWaiting={handleYoutubeBuffer}
+          onCanPlay={handleYoutubeBufferEnd}
+          onProgress={handleYoutubeProgress}
+          onTimeUpdate={handleYoutubeProgress}
+          onDuration={handleYoutubeDuration}
+          onDurationChange={handleYoutubeDuration}
+          onLoadedMetadata={handleYoutubeDuration}
+          onEnded={handleEnded}
+          onError={handleYoutubeError}
+          config={{
+            youtube: {
+              playerVars: {
+                autoplay: 1,
+                controls: 0,
+                disablekb: 1,
+                fs: 0,
+                modestbranding: 1,
+                playsinline: 1,
+                rel: 0,
+                origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+                enablejsapi: 1,
+              },
+            },
+          }}
+        />
+      </div>
     </PlayerContext.Provider>
   );
 }

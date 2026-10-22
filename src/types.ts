@@ -1,23 +1,85 @@
 export type SynthesizerMood = 'synthwave' | 'cyberpunk' | 'ambient' | 'hiphop' | 'acoustic' | 'anthem';
 
-export interface Track {
+export type SongSourceType =
+  | 'catalog'
+  | 'youtube'
+  | 'sbg'
+  | 'upload'
+  | 'local'
+  | 'stream'
+  | 'SBG_CATALOG'
+  | 'YOUTUBE'
+  | 'OTHER'
+  | string;
+
+export interface ExternalLinkItem {
+  id?: string;
+  title?: string;
+  label: string;
+  url: string;
+  type?: string;
+}
+
+export interface Song {
   id: string;
   title: string;
   artist: string;
-  album: string;
-  artwork: string;
-  duration: number; // in seconds
+  album?: string;
+  description?: string;
+  genre?: string;
+  releaseDate?: string;
+  duration?: number;
+  durationSeconds?: number;
+  explicitContent?: boolean;
   audioUrl?: string;
-  genre: string;
-  mood: SynthesizerMood;
-  bpm?: number;
+  youtubeUrl?: string;
+  youtubeVideoId?: string;
+  coverUrl?: string;
+  customCoverUrl?: string;
+  imageUrl?: string;
+  thumbnailUrl?: string;
+  heroImageUrl?: string;
+  isFeatured?: boolean;
+  isPopular?: boolean;
+  featuredBadge?: string;
+  featuredDescription?: string;
+  externalLinkEnabled?: boolean;
+  externalLinkLabel?: string;
+  externalLinkUrl?: string;
+  externalUrl?: string;
+  externalLinks?: ExternalLinkItem[];
+  downloadEnabled?: boolean;
+  downloadable?: boolean;
+  published?: boolean;
+  showYoutubeSourceBadge?: boolean;
+  source?: SongSourceType;
+  sourceType?: SongSourceType;
+  sourcePlaylistId?: string;
+  plays?: number | any;
+  likes?: number;
+  lyrics?: string;
+  lyricsLrc?: string;
+  syncedLyrics?: string;
+  createdBy?: string;
+  createdById?: string;
+  createdAt?: number | any;
+  updatedAt?: number | any;
   isLiked?: boolean;
+  isDownloaded?: boolean;
+  [key: string]: any;
+}
+
+export interface Track extends Song {
+  duration: number; // in seconds
+  bpm?: number;
+  mood?: SynthesizerMood;
+  artwork?: string;
 }
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
 export interface PlayerState {
-  currentTrack: Track | null;
+  currentTrack: Track | Song | null;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
@@ -25,45 +87,8 @@ export interface PlayerState {
   isMuted: boolean;
   repeatMode: RepeatMode;
   isShuffle: boolean;
-  queue: Track[];
+  queue: (Track | Song)[];
   queueIndex: number;
-}
-
-export type SongSourceType = 'SBG_CATALOG' | 'YOUTUBE' | 'OTHER' | string;
-
-export interface Song {
-  id: string;
-  title: string;
-  artist: string;
-  album?: string;
-  duration?: number;
-  genre?: string;
-  releaseDate?: string;
-  plays?: number;
-  likes?: number;
-  isFeatured?: boolean;
-  isPopular?: boolean;
-  coverUrl?: string;
-  thumbnailUrl?: string;
-  customCoverUrl?: string;
-  heroImageUrl?: string;
-  audioUrl?: string;
-  source?: 'catalog' | 'upload' | 'youtube' | 'sbg' | string;
-  sourceType?: SongSourceType;
-  lyrics?: string;
-  syncedLyrics?: string;
-  youtubeVideoId?: string;
-  youtubeUrl?: string;
-  downloadable?: boolean;
-  downloadEnabled?: boolean;
-  channelTitle?: string;
-  description?: string;
-  published?: boolean;
-  explicitContent?: boolean;
-  isStaffPick?: boolean;
-  createdAt?: any;
-  updatedAt?: any;
-  [key: string]: any;
 }
 
 export interface Playlist {
@@ -73,18 +98,20 @@ export interface Playlist {
   description?: string;
   coverUrl?: string;
   thumbnailUrl?: string;
-  songCount?: number;
+  songIds?: string[];
   songs?: Song[];
+  published?: boolean;
+  createdAt?: number | any;
+  updatedAt?: number | any;
   isFeatured?: boolean;
   isPublic?: boolean;
-  visibility?: 'public' | 'private' | string;
-  ownerId?: string;
-  ownerName?: string;
-  youtubePlaylistId?: string;
-  youtubeUrl?: string;
-  items?: any[];
-  createdAt?: any;
-  updatedAt?: any;
+  songCount?: number;
+  source?: string;
+  sourcePlaylistId?: string;
+  creatorName?: string;
+  creatorVerified?: boolean;
+  createdBy?: string;
+  category?: string;
   [key: string]: any;
 }
 
@@ -92,53 +119,70 @@ export interface UserPlaylistItem {
   id: string;
   songId?: string;
   youtubeVideoId?: string;
-  youtubeUrl?: string;
   title: string;
   artist: string;
   duration?: number;
-  thumbnailUrl?: string;
   coverUrl?: string;
+  thumbnailUrl?: string;
   audioUrl?: string;
-  source?: string;
-  addedAt?: number | string | any;
+  youtubeUrl?: string;
+  addedAt: number;
+  source?: 'sbg' | 'youtube' | 'catalog' | string;
   [key: string]: any;
 }
 
 export interface UserPlaylist {
   id: string;
+  uid?: string;
   ownerId: string;
-  ownerName?: string;
+  ownerName: string;
   name: string;
   title?: string;
   description?: string;
-  visibility?: 'public' | 'private' | string;
+  visibility: 'public' | 'private' | string;
   isPublic?: boolean;
-  songCount?: number;
+  songCount: number;
   coverUrl?: string;
-  items?: UserPlaylistItem[];
-  songs?: Song[];
-  createdAt?: any;
-  updatedAt?: any;
+  items: UserPlaylistItem[];
+  createdAt: number;
+  updatedAt: number;
   [key: string]: any;
 }
 
 export interface UserLibraryItem {
   id: string;
-  userId?: string;
+  userId: string;
   songId?: string;
   youtubeVideoId?: string;
-  youtubeUrl?: string;
   title: string;
   artist: string;
   thumbnail?: string;
   thumbnailUrl?: string;
   coverUrl?: string;
-  imageUrl?: string;
   audioUrl?: string;
+  youtubeUrl?: string;
   duration?: number;
-  genre?: string;
-  source?: 'youtube' | 'sbg' | 'upload' | string;
+  source: 'youtube' | 'sbg' | 'catalog' | 'upload' | string;
   addedAt: number;
+  [key: string]: any;
+}
+
+export interface UserProfile {
+  uid: string;
+  id?: string;
+  displayName?: string;
+  username?: string;
+  email?: string;
+  photoURL?: string;
+  role?: 'owner' | 'admin' | 'staff' | 'user' | 'guest' | string;
+  status?: 'active' | 'disabled' | string;
+  isAdmin?: boolean;
+  isStaff?: boolean;
+  isPublic?: boolean;
+  bio?: string;
+  favoriteGenres?: string[];
+  createdAt?: number | any;
+  updatedAt?: number | any;
   [key: string]: any;
 }
 
@@ -162,7 +206,8 @@ export interface StaffPermissions {
   manage_cta?: boolean;
   manageCta?: boolean;
   manageStaff?: boolean;
-  publishSongs?: boolean;
+  manage_branding?: boolean;
+  manage_ads?: boolean;
   [key: string]: boolean | undefined;
 }
 
@@ -179,12 +224,15 @@ export const DEFAULT_STAFF_PERMISSIONS: StaffPermissions = {
   editPlaylists: true,
   add_playlist_song: true,
   addPlaylistSong: true,
-  import_youtube_playlist: false,
-  importYouTubePlaylists: false,
+  import_youtube_playlist: true,
+  importYouTubePlaylists: true,
   manage_featured: false,
   manageFeatured: false,
   manage_cta: false,
   manageCta: false,
+  manageStaff: false,
+  manage_branding: false,
+  manage_ads: false,
 };
 
 export const DEFAULT_OWNER_PERMISSIONS: StaffPermissions = {
@@ -207,251 +255,62 @@ export const DEFAULT_OWNER_PERMISSIONS: StaffPermissions = {
   manage_cta: true,
   manageCta: true,
   manageStaff: true,
-  publishSongs: true,
+  manage_branding: true,
+  manage_ads: true,
 };
 
 export interface StaffUser {
-  id: string;
-  displayName: string;
-  email: string;
-  password?: string;
-  role: 'owner' | 'admin' | 'staff' | string;
-  status?: 'active' | 'disabled';
-  permissions: StaffPermissions;
-  createdBy?: string;
-  createdAt?: any;
-  updatedAt?: any;
-  [key: string]: any;
-}
-
-export interface UserProfile {
-  uid: string;
   id?: string;
   displayName?: string;
-  username?: string;
   email?: string;
-  photoURL?: string;
-  bio?: string;
-  isPublic?: boolean;
-  role?: 'owner' | 'admin' | 'staff' | 'user' | string;
-  isAdmin?: boolean;
-  isStaff?: boolean;
-  status?: 'active' | 'disabled';
+  password?: string;
+  role?: 'owner' | 'admin' | 'staff' | string;
+  status?: 'active' | 'disabled' | string;
   permissions?: StaffPermissions;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: number | any;
+  updatedAt?: number | any;
   [key: string]: any;
 }
 
-export type AdPlacement = 
-  | 'home_hero' 
-  | 'between_recent' 
-  | 'songs_page' 
-  | 'playlist_page' 
-  | 'search_page' 
-  | 'footer' 
+export type AdPlacement =
+  | 'top_banner'
+  | 'home_hero'
+  | 'player_bottom'
+  | 'song_list'
+  | 'sidebar'
+  | 'dialog'
+  | 'voice_interstitial'
+  | 'search_page'
   | 'song_detail_top'
   | string;
 
-export interface AdSettings {
-  enabled: boolean;
-  showAfterSongs: number;
-  adType: 'banner' | 'voice' | 'both' | string;
-  [key: string]: any;
-}
-
 export interface AdCampaign {
-  id: string;
+  id?: string;
   title: string;
   description?: string;
+  sponsorMessage?: string;
   imageUrl?: string;
   audioUrl?: string;
-  sponsorMessage?: string;
   buttonLabel?: string;
-  destinationUrl?: string;
+  destinationUrl: string;
   placement?: AdPlacement;
-  adType?: 'banner' | 'voice' | 'sbg_promo' | 'third_party' | string;
+  type?: 'banner' | 'voice' | string;
   startDate?: string;
   endDate?: string;
-  enabled?: boolean;
+  enabled: boolean;
   impressions?: number;
   clicks?: number;
-  plays?: number;
-  completions?: number;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: number;
+  updatedAt?: number;
   [key: string]: any;
 }
 
-export interface DailyAnalytics {
-  id?: string;
-  date?: string;
-  plays?: number;
-  uniqueListeners?: number;
-  uniqueVisitors?: number;
-  completions?: number;
-  listenDurationMinutes?: number;
-  sourceBreakdown?: Record<string, number>;
-  [key: string]: any;
-}
-
-export interface SongAnalytics {
-  id?: string;
-  songId?: string;
-  title?: string;
-  artist?: string;
-  plays?: number;
-  completions?: number;
-  likes?: number;
-  listenDurationMinutes?: number;
-  lastPlayedAt?: number;
-  [key: string]: any;
-}
-
-export interface PlaylistAnalytics {
-  id?: string;
-  playlistId?: string;
-  title?: string;
-  plays?: number;
-  uniqueListeners?: number;
-  [key: string]: any;
-}
-
-export interface GlobalAnalytics {
-  totalPlays?: number;
-  totalUniqueVisitors?: number;
-  totalListenDurationMinutes?: number;
-  totalSongs?: number;
-  totalPlaylists?: number;
-  todayPlays?: number;
-  todayListeners?: number;
-  activeListenersNow?: number;
-  [key: string]: any;
-}
-
-export interface CommunityPlaylist {
-  id: string;
-  playlistId: string;
-  playlistUrl: string;
-  playlistName: string;
-  title?: string;
-  description?: string;
-  curatorName?: string;
-  channelTitle?: string;
-  thumbnailUrl?: string;
-  status: 'pending' | 'approved' | 'rejected' | string;
-  featured: boolean;
-  displayOrder?: number;
-  upvotes?: number;
-  createdAt?: any;
-  [key: string]: any;
-}
-
-export type FeaturedContentType = 
-  | 'song' 
-  | 'playlist' 
-  | 'youtube_playlist' 
-  | 'release' 
-  | 'custom'
-  | 'artist'
-  | 'album'
-  | string;
-
-export interface FeaturedCtaLink {
-  id?: string;
-  label?: string;
-  url?: string;
-  type?: 'primary' | 'secondary' | 'external' | 'social' | string;
-  icon?: string;
-  displayOrder?: number;
-  [key: string]: any;
-}
-
-export interface ExternalLinkItem {
-  id?: string;
-  title?: string;
-  label?: string;
-  url?: string;
-  type?: string;
-  icon?: string;
-  enabled?: boolean;
-  [key: string]: any;
-}
-
-export interface FeaturedConfig {
-  id?: string;
-  enabled?: boolean;
-  type?: FeaturedContentType;
-  title?: string;
-  subtitle?: string;
-  description?: string;
-  thumbnailUrl?: string;
-  coverUrl?: string;
-  badge?: string;
-  songId?: string | null;
-  featuredSongId?: string | null;
-  playlistId?: string | null;
-  youtubePlaylistId?: string | null;
-  youtubeUrl?: string | null;
-  channelTitle?: string;
-  artistName?: string;
-  albumName?: string;
-  source?: 'sbg' | 'youtube' | string;
-  ctaText?: string;
-  ctaDestination?: string;
-  externalLinks?: (FeaturedCtaLink | ExternalLinkItem)[];
-  displayOrder?: number;
-  startDate?: string | null;
-  endDate?: string | null;
-  showCommunityPlaylistsOnHome?: boolean;
-  featuredOfflineSongId?: string | null;
-  featuredOfflineBadge?: string;
-  featuredOfflineDescription?: string;
-  updatedAt?: any;
-  updatedBy?: string;
-  [key: string]: any;
-}
-
-export interface UnifiedFeaturedConfig extends FeaturedConfig {}
-
-export interface FeaturedRelease {
-  id: string;
-  title: string;
-  subtitle?: string;
-  artist?: string;
-  description?: string;
-  badge?: string;
-  coverUrl?: string;
-  thumbnailUrl?: string;
-  songId?: string;
-  playlistId?: string;
-  audioUrl?: string;
-  links?: FeaturedCtaLink[];
-  externalLinks?: (FeaturedCtaLink | ExternalLinkItem)[];
-  [key: string]: any;
-}
-
-export interface FeaturedReleaseAnalytics {
-  id?: string;
-  views?: number;
-  plays?: number;
-  clicks?: number;
-  [key: string]: any;
-}
-
-export interface FeaturedHistoryItem {
-  id: string;
-  title: string;
-  subtitle?: string;
-  type: string;
-  featuredAt: number | any;
-  archivedAt?: number | any;
-  thumbnailUrl?: string;
-  stats?: {
-    views?: number;
-    plays?: number;
-    clicks?: number;
-  };
+export interface AdSettings {
+  enabled: boolean;
+  showAfterSongs?: number;
+  adType?: 'banner' | 'voice' | 'hybrid' | string;
+  frequencySeconds?: number;
+  updatedAt?: number;
   [key: string]: any;
 }
 
@@ -462,16 +321,209 @@ export interface AndroidRelease {
   versionCode: number;
   releaseName: string;
   releaseNotes: string;
-  storagePath?: string;
+  storagePath: string;
   downloadUrl: string;
   fileName: string;
   fileSizeBytes: number;
   fileSizeFormatted: string;
   sha256: string;
+  minAndroidVersion?: string;
+  targetAndroidVersion?: string;
+  downloadButtonText?: string;
+  installInstructions?: string;
+  published: boolean;
+  isDefault: boolean;
   downloadCount?: number;
-  isActive?: boolean;
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
+  [key: string]: any;
+}
+
+export interface CommunityPlaylist {
+  id: string;
+  playlistId: string;
+  playlistUrl: string;
+  title: string;
+  description?: string;
+  submittedByName?: string;
+  submittedByEmail?: string;
+  status: 'pending' | 'approved' | 'rejected' | string;
+  featured?: boolean;
+  displayOrder?: number;
+  songCount?: number;
+  coverUrl?: string;
+  createdAt: number;
+  approvedAt?: number;
+  [key: string]: any;
+}
+
+export type FeaturedContentType = 'song' | 'playlist' | 'youtube_playlist' | 'release' | 'custom' | string;
+
+export interface FeaturedCtaLink {
+  id?: string;
+  label: string;
+  url: string;
+  type?: 'youtube' | 'instagram' | 'spotify' | 'external' | 'internal' | string;
+  order?: number;
+  enabled?: boolean;
+  icon?: string;
+  description?: string;
+  [key: string]: any;
+}
+
+export interface FeaturedConfig {
+  id?: string;
+  enabled?: boolean;
+  featuredSongId?: string | null;
+  featuredOfflineSongId?: string | null;
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  ctaText?: string;
+  ctaUrl?: string;
+  coverUrl?: string;
+  badge?: string;
+  externalLinks?: any[];
+  updatedBy?: string;
+  updatedAt?: number;
+  [key: string]: any;
+}
+
+export interface UnifiedFeaturedConfig {
+  id?: string;
+  enabled: boolean;
+  type: FeaturedContentType | string;
+  title: string;
+  subtitle?: string;
+  description?: string;
+  thumbnailUrl?: string;
+  coverUrl?: string;
+  badge?: string;
+  songId?: string | null;
+  featuredSongId?: string | null;
+  featuredOfflineSongId?: string | null;
+  playlistId?: string | null;
+  youtubePlaylistId?: string | null;
+  youtubeUrl?: string | null;
+  channelTitle?: string;
+  artistName?: string;
+  albumName?: string;
+  source?: string;
+  ctaText?: string;
+  ctaUrl?: string;
+  ctaDestination?: string;
+  ctaType?: string;
+  ctaLinks?: FeaturedCtaLink[];
+  ctaLinksList?: FeaturedCtaLink[];
+  externalLinks?: any[];
+  displayOrder?: number;
+  startDate?: string | null;
+  endDate?: string | null;
   createdAt?: any;
-  updatedAt?: any;
+  updatedBy?: string;
+  updatedAt?: number;
+  releaseDate?: string;
+  audioUrl?: string;
+  plays?: number;
+  [key: string]: any;
+}
+
+export interface FeaturedRelease {
+  id: string;
+  songId: string;
+  title: string;
+  artist: string;
+  badge?: string;
+  description?: string;
+  ctaUrl?: string;
+  ctaText?: string;
+  externalLinks?: FeaturedCtaLink[];
+  coverUrl?: string;
+  audioUrl?: string;
+  active: boolean;
+  startDate?: string;
+  endDate?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  [key: string]: any;
+}
+
+export interface FeaturedReleaseAnalytics {
+  id?: string;
+  releaseId: string;
+  impressions?: number;
+  plays?: number;
+  songPlays?: number;
+  clicks?: number;
+  completions?: number;
+  totalListenSeconds?: number;
+  lastTrackedAt?: number;
+  [key: string]: any;
+}
+
+export interface FeaturedHistoryItem {
+  id?: string;
+  config: UnifiedFeaturedConfig;
+  archivedAt: number;
+  title: string;
+  artistName?: string;
+  [key: string]: any;
+}
+
+export interface DailyAnalytics {
+  id?: string;
+  date: string;
+  totalPlays: number;
+  totalListenSeconds: number;
+  uniqueVisitorsCount?: number;
+  completedCount?: number;
+  authenticatedPlays?: number;
+  authenticatedListenSeconds?: number;
+  authenticatedCompletedCount?: number;
+  authenticatedSkippedCount?: number;
+  authenticatedUniqueCount?: number;
+  anonymousPlays?: number;
+  anonymousListenSeconds?: number;
+  anonymousCompletedCount?: number;
+  anonymousSkippedCount?: number;
+  anonymousUniqueCount?: number;
+  skippedCount?: number;
+  sourceBreakdown?: Record<string, number>;
+  [key: string]: any;
+}
+
+export interface SongAnalytics {
+  id?: string;
+  songId: string;
+  title: string;
+  artist: string;
+  totalPlays: number;
+  totalListenSeconds: number;
+  completedCount?: number;
+  skippedCount?: number;
+  lastPlayedAt?: number;
+  [key: string]: any;
+}
+
+export interface PlaylistAnalytics {
+  id?: string;
+  playlistId: string;
+  title: string;
+  totalPlays: number;
+  totalListenSeconds: number;
+  lastPlayedAt?: number;
+  [key: string]: any;
+}
+
+export interface GlobalAnalytics {
+  totalPlays: number;
+  totalListenSeconds: number;
+  totalSongs?: number;
+  totalPlaylists?: number;
+  authenticatedPlays?: number;
+  activeUsers24h?: number;
+  updatedAt?: number;
   [key: string]: any;
 }
 
@@ -486,19 +538,24 @@ export interface DeploymentInfo {
   firebaseProjectId: string;
   authDomain: string;
   status: string;
+  youtubeApiStatus?: string;
+  adNetworkStatus?: string;
+  uptimeSeconds?: number;
+  envConfigured?: string[];
   [key: string]: any;
 }
 
 export interface ImportAlert {
   id: string;
-  videoId: string;
-  videoTitle?: string;
-  playlistId?: string;
-  playlistTitle?: string;
+  type: string;
+  title: string;
+  message?: string;
   error?: string;
-  status: 'failed' | 'retrying' | 'resolved' | string;
-  createdAt?: any;
-  updatedAt?: any;
+  status: 'pending' | 'failed' | 'retrying' | 'resolved';
+  playlistUrl?: string;
+  youtubePlaylistId?: string;
+  createdAt: number | any;
+  retries?: number;
   [key: string]: any;
 }
 
@@ -518,7 +575,5 @@ export interface NavigationVisibilitySettings {
   showCommunityPlaylistsOnHome: boolean;
   showAiPromoBannerOnHome: boolean;
   showApkDownloadSectionOnHome: boolean;
-  updatedAt?: number;
-  updatedBy?: string;
   [key: string]: any;
 }

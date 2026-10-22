@@ -188,7 +188,7 @@ export default function HomepageFeaturedHero({
   })();
 
   // Platform/Brand Icon Resolver
-  const getLinkIcon = (label: string, iconKey?: string) => {
+  const getLinkIcon = (label: string = '', iconKey?: string) => {
     const key = (iconKey || label).toLowerCase();
     if (key.includes('youtube')) {
       return <Youtube size={15} className="text-red-400 shrink-0" />;

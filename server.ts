@@ -10,12 +10,14 @@ import {
   doc, 
   setDoc, 
   getDoc, 
+  getDocs,
   updateDoc, 
   deleteDoc, 
   writeBatch, 
   serverTimestamp 
 } from 'firebase/firestore';
 import { FALLBACK_SONGS, FALLBACK_PLAYLISTS } from './src/data/fallbackCatalog';
+import { handleYouTubeSearchRequest } from './api/lib/youtubeSearchHandler';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,13 +58,72 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Fallback Catalog endpoint
-app.get('/api/songs', (req, res) => {
-  res.json({ ok: true, songs: FALLBACK_SONGS });
+// In-memory cache for server-proxied Firestore catalog
+let cachedSongs: any[] = [];
+let cachedSongsTime = 0;
+let cachedPlaylists: any[] = [];
+let cachedPlaylistsTime = 0;
+
+async function getServerSongs() {
+  const now = Date.now();
+  if (cachedSongs.length > 0 && now - cachedSongsTime < 120000) {
+    return cachedSongs;
+  }
+  try {
+    const snap = await getDocs(collection(db, 'songs'));
+    const firestoreSongs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (firestoreSongs.length > 0) {
+      const existingIds = new Set(firestoreSongs.map((s: any) => s.id));
+      const combined = [...firestoreSongs];
+      for (const fb of FALLBACK_SONGS) {
+        if (!existingIds.has(fb.id)) {
+          combined.push(fb);
+        }
+      }
+      cachedSongs = combined;
+      cachedSongsTime = now;
+      return combined;
+    }
+  } catch (err) {
+    console.warn('[server.ts] Notice loading firestore songs:', err);
+  }
+  return FALLBACK_SONGS;
+}
+
+async function getServerPlaylists() {
+  const now = Date.now();
+  if (cachedPlaylists.length > 0 && now - cachedPlaylistsTime < 120000) {
+    return cachedPlaylists;
+  }
+  try {
+    const snap = await getDocs(collection(db, 'playlists'));
+    const firestorePlaylists = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (firestorePlaylists.length > 0) {
+      cachedPlaylists = firestorePlaylists;
+      cachedPlaylistsTime = now;
+      return firestorePlaylists;
+    }
+  } catch (err) {
+    console.warn('[server.ts] Notice loading firestore playlists:', err);
+  }
+  return FALLBACK_PLAYLISTS;
+}
+
+// Catalog endpoints
+app.get(['/api/songs', '/api/catalog/songs'], async (req, res) => {
+  const songs = await getServerSongs();
+  res.json({ ok: true, songs });
 });
 
-app.get('/api/playlists', (req, res) => {
-  res.json({ ok: true, playlists: FALLBACK_PLAYLISTS });
+app.get(['/api/playlists', '/api/catalog/playlists'], async (req, res) => {
+  const playlists = await getServerPlaylists();
+  res.json({ ok: true, playlists });
+});
+
+app.post('/api/catalog/invalidate', (req, res) => {
+  cachedSongsTime = 0;
+  cachedPlaylistsTime = 0;
+  res.json({ ok: true, message: 'Server catalog cache invalidated' });
 });
 
 // Background Sync API: Replay and Ingest Failed Analytics Events
@@ -184,47 +245,9 @@ app.post('/api/playlists/sync', async (req, res) => {
   }
 });
 
-// YouTube Search API
-app.post('/api/youtube/search', async (req, res) => {
-  const { query } = req.body || {};
-  if (!query) {
-    return res.status(400).json({ ok: false, error: 'Query is required' });
-  }
-
-  // Find close catalog matches or simulated stream
-  const matched = FALLBACK_SONGS.filter(s => 
-    s.title.toLowerCase().includes(query.toLowerCase()) || 
-    s.artist.toLowerCase().includes(query.toLowerCase())
-  );
-
-  if (matched.length > 0) {
-    return res.json({
-      ok: true,
-      results: matched.map(m => ({
-        id: m.id,
-        title: m.title,
-        artist: m.artist,
-        duration: m.duration,
-        thumbnailUrl: m.coverUrl,
-        audioUrl: m.audioUrl,
-      })),
-    });
-  }
-
-  // Create formatted playable item
-  res.json({
-    ok: true,
-    results: [
-      {
-        id: `yt-${Date.now()}`,
-        title: query,
-        artist: 'YouTube Audio Stream',
-        duration: 195,
-        thumbnailUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80',
-        audioUrl: FALLBACK_SONGS[0].audioUrl,
-      }
-    ],
-  });
+// YouTube Search API (Canonical real YouTube Data API v3 & handler)
+app.all('/api/youtube/search', (req, res) => {
+  return handleYouTubeSearchRequest(req, res);
 });
 
 // Lyrics API

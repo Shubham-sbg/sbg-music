@@ -330,8 +330,8 @@ export default function AdminAnalytics() {
       if (sortBy === 'anonPlays') return (b.anonymousPlays || 0) - (a.anonymousPlays || 0);
       if (sortBy === 'authPlays') return (b.authenticatedPlays || 0) - (a.authenticatedPlays || 0);
       if (sortBy === 'completion') {
-        const rateA = a.totalPlays ? (a.completedCount / a.totalPlays) : 0;
-        const rateB = b.totalPlays ? (b.completedCount / b.totalPlays) : 0;
+        const rateA = a.totalPlays ? ((a.completedCount || 0) / a.totalPlays) : 0;
+        const rateB = b.totalPlays ? ((b.completedCount || 0) / b.totalPlays) : 0;
         return rateB - rateA;
       }
       return 0;
@@ -1136,13 +1136,13 @@ export default function AdminAnalytics() {
               <div className="bg-white/5 border border-white/5 p-3 rounded-2xl">
                 <div className="text-[10px] font-bold text-white/40 uppercase">Completions</div>
                 <div className="text-base font-bold text-emerald-300 mt-0.5">
-                  {(selectedSong.completedCount || 0).toLocaleString()} ({selectedSong.totalPlays ? Math.round((selectedSong.completedCount / selectedSong.totalPlays) * 100) : 0}%)
+                  {(selectedSong.completedCount || 0).toLocaleString()} ({selectedSong.totalPlays ? Math.round(((selectedSong.completedCount || 0) / selectedSong.totalPlays) * 100) : 0}%)
                 </div>
               </div>
               <div className="bg-white/5 border border-white/5 p-3 rounded-2xl">
                 <div className="text-[10px] font-bold text-white/40 uppercase">Skips</div>
                 <div className="text-base font-bold text-amber-300 mt-0.5">
-                  {(selectedSong.skippedCount || 0).toLocaleString()} ({selectedSong.totalPlays ? Math.round((selectedSong.skippedCount / selectedSong.totalPlays) * 100) : 0}%)
+                  {(selectedSong.skippedCount || 0).toLocaleString()} ({selectedSong.totalPlays ? Math.round(((selectedSong.skippedCount || 0) / selectedSong.totalPlays) * 100) : 0}%)
                 </div>
               </div>
             </div>

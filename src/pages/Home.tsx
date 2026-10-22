@@ -1,227 +1,298 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { 
   Play, 
+  Pause, 
   Sparkles, 
+  Music, 
+  ChevronRight, 
   Flame, 
-  Mic, 
-  ShieldCheck, 
-  Headphones, 
-  Clock, 
+  ListPlus, 
   Heart,
-  ChevronRight 
+  Loader2,
+  ListMusic
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { useFavorites } from '../context/FavoritesContext';
-import { FALLBACK_SONGS, FALLBACK_PLAYLISTS } from '../data/fallbackCatalog';
-import { Song } from '../types';
+import { usePaginatedSongs, usePaginatedPlaylists } from '../hooks/useCatalog';
+import { getActiveFeatured, UnifiedActiveFeaturedResult } from '../lib/featured';
+import { Song, Playlist } from '../types';
+
+import HomepageFeaturedHero from '../components/HomepageFeaturedHero';
+import TrendingTagsSection from '../components/TrendingTagsSection';
+import ContinueListeningSection from '../components/ContinueListeningSection';
+import RecentlyPlayedSection from '../components/RecentlyPlayedSection';
+import FavoriteSongsSection from '../components/FavoriteSongsSection';
+import CommunityPlaylistsSection from '../components/CommunityPlaylistsSection';
+import FavoriteButton from '../components/FavoriteButton';
+import ShareSongButton from '../components/ShareSongButton';
+import AddToPlaylistModal from '../components/AddToPlaylistModal';
+import AdPlacementBanner from '../components/AdPlacementBanner';
 
 export default function Home() {
   const navigate = useNavigate();
-  const { playSong, currentSong, isPlaying } = usePlayer();
-  const { isFavorite, toggleFavorite } = useFavorites();
+  const { playSong, currentSong, isPlaying, togglePlayPause, addToQueue, isLoading, isBuffering } = usePlayer();
+  const { isFavorite } = useFavorites();
 
-  const featuredTrack = FALLBACK_SONGS[0];
+  // Featured Release State
+  const [featuredData, setFeaturedData] = useState<UnifiedActiveFeaturedResult | null>(null);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+
+  // Modal State for adding songs to playlists
+  const [playlistModalItem, setPlaylistModalItem] = useState<Song | null>(null);
+
+  // Real Catalog Songs & Playlists from Firestore
+  const { songs, loading: songsLoading, errorMsg: songsError } = usePaginatedSongs(16);
+  const { playlists, loading: playlistsLoading } = usePaginatedPlaylists(6);
+
+  useEffect(() => {
+    let isMounted = true;
+    getActiveFeatured()
+      .then((data) => {
+        if (isMounted) {
+          setFeaturedData(data);
+          setFeaturedLoading(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setFeaturedLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleSongPlay = (song: Song) => {
+    if (currentSong?.id === song.id) {
+      togglePlayPause();
+    } else {
+      playSong(song, songs);
+    }
+  };
 
   return (
-    <div className="space-y-10 pb-28">
-      {/* Hero Showcase Banner */}
-      <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-purple-900/60 via-[#13111f] to-[#0c0c12] border border-purple-500/20 p-6 sm:p-10 shadow-2xl shadow-purple-950/40">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-pink-600/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 justify-between">
-          <div className="space-y-4 max-w-xl text-center md:text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-bold">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Studio Master Release 2026</span>
-            </div>
-
-            <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-              Pure Sound. <br />
-              <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-400 bg-clip-text text-transparent">
-                Uninterrupted Voice.
-              </span>
-            </h1>
-
-            <p className="text-sm sm:text-base text-white/60 leading-relaxed">
-              Experience zero-dropout background streaming with custom studio DSP filters: crystal clear vocal boost, punchy bass, and instant offline buffering.
-            </p>
-
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
-              <button
-                onClick={() => playSong(featuredTrack, FALLBACK_SONGS)}
-                className="px-6 py-3 rounded-2xl bg-white text-black font-extrabold text-sm hover:bg-white/90 shadow-xl shadow-white/20 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-              >
-                <Play className="w-4 h-4 fill-black" />
-                <span>Play Featured Anthem</span>
-              </button>
-
-              <button
-                onClick={() => navigate('/songs')}
-                className="px-5 py-3 rounded-2xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 text-white font-semibold text-sm transition-all cursor-pointer"
-              >
-                Browse Catalog
-              </button>
-            </div>
-          </div>
-
-          {/* Album artwork card */}
-          <div className="relative shrink-0 group cursor-pointer" onClick={() => playSong(featuredTrack, FALLBACK_SONGS)}>
-            <div className="w-56 h-56 sm:w-64 sm:h-64 rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-purple-950/60 relative">
-              <img
-                src={featuredTrack.coverUrl}
-                alt={featuredTrack.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-4">
-                <div>
-                  <p className="text-white font-bold text-sm truncate">{featuredTrack.title}</p>
-                  <p className="text-purple-300 text-xs truncate">{featuredTrack.artist}</p>
-                </div>
-              </div>
-            </div>
-            <div className="absolute -bottom-3 -right-3 w-12 h-12 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-lg shadow-purple-900/50 group-hover:scale-110 transition-transform">
-              <Play className="w-5 h-5 fill-white ml-0.5" />
-            </div>
+    <div className="space-y-8 sm:space-y-10 pb-28">
+      {/* 1. HERO SHOWCASE / FEATURED RELEASE BANNER */}
+      {featuredData?.config ? (
+        <HomepageFeaturedHero
+          activeFeatured={featuredData.config}
+          song={featuredData.song}
+          playlist={featuredData.playlist}
+          loading={featuredLoading}
+        />
+      ) : featuredLoading ? (
+        <div className="w-full bg-[#111116] border border-purple-500/20 rounded-2xl md:rounded-3xl p-6 sm:p-8 animate-pulse flex items-center gap-6 min-h-[180px]">
+          <div className="w-24 h-24 sm:w-36 sm:h-36 rounded-2xl bg-white/5 shrink-0" />
+          <div className="space-y-3 flex-1">
+            <div className="w-32 h-5 rounded-full bg-purple-500/20" />
+            <div className="w-2/3 h-8 rounded-xl bg-white/10" />
+            <div className="w-1/2 h-4 rounded-lg bg-white/5" />
           </div>
         </div>
-      </section>
+      ) : null}
 
-      {/* Feature Highlights Grid ("Voice Problem Fix & Stop Problem Fix") */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-2xl bg-[#111118] border border-white/[0.06] space-y-2">
-          <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
-            <Mic className="w-5 h-5" />
-          </div>
-          <h3 className="text-sm font-bold text-white">Vocal Boost Filter</h3>
-          <p className="text-xs text-white/50 leading-relaxed">
-            Peaking parametric EQ lifts singing and speech frequencies so lyrics and voice cut through the mix without distortion.
-          </p>
-        </div>
+      {/* 2. TRENDING DISCOVERY TAGS */}
+      <TrendingTagsSection />
 
-        <div className="p-5 rounded-2xl bg-[#111118] border border-white/[0.06] space-y-2">
-          <div className="w-10 h-10 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <h3 className="text-sm font-bold text-white">Non-Stop Background Audio</h3>
-          <p className="text-xs text-white/50 leading-relaxed">
-            Engineered with HTTP Range caching and stall-recovery watchdogs to prevent lock screen pauses or background dropouts.
-          </p>
-        </div>
+      {/* 3. CONTINUE LISTENING (Resumes playback where user paused) */}
+      <ContinueListeningSection />
 
-        <div className="p-5 rounded-2xl bg-[#111118] border border-white/[0.06] space-y-2">
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-            <Headphones className="w-5 h-5" />
-          </div>
-          <h3 className="text-sm font-bold text-white">Continuous Auto-Advance</h3>
-          <p className="text-xs text-white/50 leading-relaxed">
-            Seamless queue transitions automatically flow into the next track when a song finishes, with full MediaSession sync.
-          </p>
-        </div>
-      </section>
+      {/* 4. RECENTLY PLAYED */}
+      <RecentlyPlayedSection />
 
-      {/* Trending Now Songs */}
+      {/* 5. FAVORITE SONGS */}
+      <FavoriteSongsSection />
+
+      {/* 6. POPULAR / CATALOG TRACKS (Real Firestore Songs) */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Flame className="w-5 h-5 text-pink-500" />
-            <h2 className="text-lg sm:text-xl font-bold text-white">Trending Hits</h2>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-400" />
+              <span>Popular Tracks</span>
+            </h2>
+            <p className="text-xs text-white/50">Top streaming master tracks from SBG Music</p>
           </div>
-          <button
-            onClick={() => navigate('/songs')}
-            className="text-xs font-semibold text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer"
+
+          <Link
+            to="/songs"
+            className="text-xs font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors"
           >
-            <span>See All</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
+            <span>View All ({songs.length})</span>
+            <ChevronRight size={14} />
+          </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {FALLBACK_SONGS.slice(0, 6).map((song: Song) => {
-            const isCurrent = currentSong?.id === song.id;
-            const liked = isFavorite(song.id);
+        {songsLoading && songs.length === 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="p-3 rounded-2xl bg-[#111118] border border-white/5 animate-pulse flex items-center gap-3">
+                <div className="w-14 h-14 rounded-xl bg-white/5 shrink-0" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-4 bg-white/10 rounded w-3/4" />
+                  <div className="h-3 bg-white/5 rounded w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {songs.slice(0, 12).map((song) => {
+              const isCurrent = currentSong?.id === song.id;
+              const isCurrentPlaying = isCurrent && isPlaying;
+              const isCurrentLoading = isCurrent && (isLoading || isBuffering);
+              const artwork = song.coverUrl || song.thumbnailUrl || (song as any).imageUrl;
 
-            return (
-              <div
-                key={song.id}
-                className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 group cursor-pointer ${
-                  isCurrent
-                    ? 'bg-purple-900/20 border-purple-500/40'
-                    : 'bg-[#111118] hover:bg-white/[0.04] border-white/[0.06]'
-                }`}
-                onClick={() => playSong(song, FALLBACK_SONGS)}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0">
-                    <img src={song.coverUrl} alt={song.title} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Play className="w-4 h-4 fill-white text-white" />
+              return (
+                <div
+                  key={song.id}
+                  onClick={() => handleSongPlay(song)}
+                  className={`group relative p-3 rounded-2xl bg-[#111116] hover:bg-[#18181f] border transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 ${
+                    isCurrent 
+                      ? 'border-purple-500/40 bg-purple-950/20 shadow-lg shadow-purple-950/30' 
+                      : 'border-white/5 hover:border-white/15'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Artwork + Play Overlay */}
+                    <div className="relative w-13 h-13 sm:w-14 sm:h-14 rounded-xl overflow-hidden shrink-0 bg-zinc-900 border border-white/10 shadow-sm">
+                      {artwork ? (
+                        <img
+                          src={artwork}
+                          alt={song.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-white/20">
+                          <Music size={20} />
+                        </div>
+                      )}
+
+                      <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity ${
+                        isCurrent ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      }`}>
+                        {isCurrentLoading ? (
+                          <Loader2 size={16} className="text-purple-400 animate-spin" />
+                        ) : isCurrentPlaying ? (
+                          <Pause size={16} fill="white" className="text-white" />
+                        ) : (
+                          <Play size={16} fill="white" className="text-white ml-0.5" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Song Details */}
+                    <div className="min-w-0 flex-1">
+                      <h3 className={`text-xs sm:text-sm font-bold truncate transition-colors ${
+                        isCurrent ? 'text-purple-300' : 'text-white group-hover:text-purple-300'
+                      }`} title={song.title}>
+                        {song.title}
+                      </h3>
+                      <p className="text-[11px] text-white/50 truncate mt-0.5" title={song.artist}>
+                        {song.artist}
+                      </p>
+                      {song.duration ? (
+                        <span className="text-[10px] font-mono text-white/30 block mt-0.5">
+                          {Math.floor(song.duration / 60)}:{(song.duration % 60).toString().padStart(2, '0')}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
 
-                  <div className="min-w-0">
-                    <h4 className={`text-xs sm:text-sm font-bold truncate ${isCurrent ? 'text-purple-300' : 'text-white'}`}>
-                      {song.title}
-                    </h4>
-                    <p className="text-[11px] text-white/50 truncate">{song.artist}</p>
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <FavoriteButton songId={song.id} song={song} size={15} />
+                    <button
+                      onClick={() => setPlaylistModalItem(song)}
+                      title="Add to Playlist"
+                      className="p-1.5 text-white/40 hover:text-purple-400 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                    >
+                      <ListPlus size={16} />
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-[11px] font-mono text-white/40 hidden sm:inline">
-                    {Math.floor((song.duration || 0) / 60)}:{((song.duration || 0) % 60).toString().padStart(2, '0')}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(song);
-                    }}
-                    className="p-1.5 text-white/30 hover:text-pink-500 transition-colors cursor-pointer"
-                  >
-                    <Heart className={`w-4 h-4 ${liked ? 'fill-pink-500 text-pink-500' : ''}`} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
-      {/* Curated Editorial Playlists */}
+      {/* 7. FEATURED & COMMUNITY PLAYLISTS */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg sm:text-xl font-bold text-white">Curated Soundtracks</h2>
-          <button
-            onClick={() => navigate('/playlists')}
-            className="text-xs font-semibold text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer"
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+              <ListMusic className="w-5 h-5 text-indigo-400" />
+              <span>Curated Playlists</span>
+            </h2>
+            <p className="text-xs text-white/50">Hand-picked selections and official sound collections</p>
+          </div>
+
+          <Link
+            to="/playlists"
+            className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
           >
-            <span>View All</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
+            <span>Explore All</span>
+            <ChevronRight size={14} />
+          </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {FALLBACK_PLAYLISTS.map((pl) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {playlists.slice(0, 6).map((pl) => (
             <div
               key={pl.id}
               onClick={() => navigate(`/playlist/${pl.id}`)}
-              className="p-4 rounded-2xl bg-[#111118] hover:bg-white/[0.04] border border-white/[0.06] transition-all space-y-3 cursor-pointer group"
+              className="group p-4 rounded-2xl bg-[#111118] hover:bg-white/[0.04] border border-white/5 hover:border-purple-500/30 transition-all duration-200 cursor-pointer space-y-3 shadow-lg"
             >
-              <div className="relative w-full aspect-video rounded-xl overflow-hidden">
-                <img src={pl.coverUrl} alt={pl.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-[10px] font-bold text-white/80">
-                  {pl.songCount} Tracks
+              <div className="relative aspect-video rounded-xl overflow-hidden bg-zinc-900 border border-white/10">
+                <img
+                  src={pl.coverUrl || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80'}
+                  alt={pl.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="w-10 h-10 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform">
+                    <Play size={16} fill="white" className="ml-0.5 text-white" />
+                  </div>
                 </div>
+                {pl.songCount ? (
+                  <div className="absolute bottom-2 right-2 bg-black/80 text-white font-mono text-[10px] px-2 py-0.5 rounded border border-white/10 backdrop-blur-md">
+                    {pl.songCount} tracks
+                  </div>
+                ) : null}
               </div>
+
               <div>
-                <h3 className="text-sm font-bold text-white group-hover:text-purple-400 transition-colors">{pl.title}</h3>
-                <p className="text-xs text-white/50 line-clamp-2 mt-0.5 leading-relaxed">{pl.description}</p>
+                <h3 className="text-sm font-bold text-white group-hover:text-purple-300 transition-colors truncate">
+                  {pl.title}
+                </h3>
+                <p className="text-xs text-white/50 line-clamp-1 mt-0.5">
+                  {pl.description || (pl.songCount ? `${pl.songCount} tracks` : 'Curated soundscape')}
+                </p>
               </div>
             </div>
           ))}
         </div>
       </section>
+
+      {/* 8. COMMUNITY PLAYLISTS EXPANDED */}
+      <CommunityPlaylistsSection showCommunityFeatured={true} />
+
+      {/* 9. NON-INTRUSIVE AD PLACEMENT */}
+      <AdPlacementBanner placement="footer" />
+
+      {/* MODAL: ADD TO PLAYLIST */}
+      {playlistModalItem && (
+        <AddToPlaylistModal
+          isOpen={Boolean(playlistModalItem)}
+          onClose={() => setPlaylistModalItem(null)}
+          songItem={playlistModalItem}
+          onSuccess={() => setPlaylistModalItem(null)}
+        />
+      )}
     </div>
   );
 }

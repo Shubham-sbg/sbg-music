@@ -38,7 +38,7 @@ export default function AdPlacementBanner({ placement, slot, className = '' }: A
         const [entry] = entries;
         if (entry.isIntersecting && entry.intersectionRatio >= 0.5 && !hasRecordedImpression.current) {
           hasRecordedImpression.current = true;
-          recordAdImpression(ad.id);
+          if (ad.id) recordAdImpression(ad.id);
           observer.disconnect();
         }
       },
@@ -55,7 +55,7 @@ export default function AdPlacementBanner({ placement, slot, className = '' }: A
   if (!ad) return null;
 
   const handleClick = (e: React.MouseEvent) => {
-    recordAdClick(ad.id);
+    if (ad.id) recordAdClick(ad.id);
   };
 
   return (

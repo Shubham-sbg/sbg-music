@@ -138,7 +138,7 @@ export default function AdminAds() {
     setButtonLabel(camp.buttonLabel || 'Visit Website →');
     setDestinationUrl(camp.destinationUrl || '');
     setPlacement(camp.placement || 'home_hero');
-    setAdType(camp.type || 'banner');
+    setAdType((camp.type as any) || 'banner');
     setStartDate(camp.startDate || '');
     setEndDate(camp.endDate || '');
     setEnabled(camp.enabled ?? true);
@@ -182,7 +182,7 @@ export default function AdminAds() {
         enabled,
       };
 
-      if (editingCampaign) {
+      if (editingCampaign && editingCampaign.id) {
         await updateAdCampaign(editingCampaign.id, payload);
       } else {
         await createAdCampaign(payload as any);
@@ -198,6 +198,7 @@ export default function AdminAds() {
   };
 
   const handleToggle = async (camp: AdCampaign) => {
+    if (!camp.id) return;
     try {
       await toggleAdCampaignStatus(camp.id, camp.enabled ?? true);
       setCampaigns((prev) =>
@@ -350,7 +351,7 @@ export default function AdminAds() {
                         <Edit3 size={15} />
                       </button>
                       <button
-                        onClick={() => handleDelete(camp.id)}
+                        onClick={() => camp.id && handleDelete(camp.id)}
                         className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
                         title="Delete Campaign"
                       >
